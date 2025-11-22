@@ -1,0 +1,40 @@
+# Core Framework
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+
+# AI Models
+langchain-openai>=0.2.0
+langchain-anthropic>=0.3.0
+langchain-google-genai>=2.0.0
+
+# Search & Tools
+tavily-python>=0.5.0
+duckduckgo-search>=6.0.0
+google-search-results>=2.4.0
+beautifulsoup4>=4.12.0
+requests>=2.31.0
+
+# Backend
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.9.0
+python-dotenv>=1.0.0
+pytest>=8.0.0
+pytest-asyncio>=0.24.0
+
+# Frontend
+streamlit>=1.40.0
+plotly>=5.24.0
+networkx>=3.4.0
+matplotlib>=3.9.0
+
+# Data & Visualization
+pandas>=2.2.0
+numpy>=2.0.0
+python-multipart>=0.0.12
+
+# Monitoring & Tracing
+langsmith>=0.2.0
+click>=8.1.0
