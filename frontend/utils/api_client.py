@@ -107,6 +107,29 @@ class ResearchAPIClient:
             st.error(f"Error fetching report: {e}")
             return None
     
+    def get_session_logs(self, session_id: str, last_n: int = 50) -> Optional[Dict[str, Any]]:
+        """
+        Get backend logs for a research session
+        
+        Args:
+            session_id: Session ID to query
+            last_n: Number of recent logs to retrieve
+        
+        Returns:
+            Dict with logs list
+        """
+        try:
+            url = f"{self.base_url}{self.api_prefix}/research/logs/{session_id}?last_n={last_n}"
+            response = requests.get(
+                url,
+                headers=self._get_headers(),
+                timeout=10
+            )
+            return self._handle_response(response)
+        except Exception as e:
+            # Don't show error for logs, just fail silently
+            return None
+    
     def list_sessions(self) -> List[Dict[str, Any]]:
         """
         List all research sessions

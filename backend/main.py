@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 import uvicorn
 import os
+import logging
 from dotenv import load_dotenv
 
 from api.routes import router as api_router
@@ -11,6 +12,15 @@ from services.langsmith_client import LangSmithClient
 
 # Load environment variables
 load_dotenv()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Deep Research AI Agent",
@@ -44,7 +54,7 @@ langsmith_client = LangSmithClient()
 async def startup_event():
     """Initialize services on startup"""
     await langsmith_client.initialize()
-    print("Deep Research Agent Backend Started")
+    logger.info("🚀 Deep Research Agent Backend Started")
 
 @app.on_event("shutdown")
 async def shutdown_event():

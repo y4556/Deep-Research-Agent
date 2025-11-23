@@ -3,12 +3,15 @@ from typing import Dict, Any, List
 import asyncio
 import uuid
 import re
+import logging
 from datetime import datetime
 
 from .state import ResearchState, Fact, RiskFlag, Connection
 from .models import MultiModelCoordinator
 from services.search import DeepSearchEngine
 from services.validation import SourceValidator as ValidationService
+
+logger = logging.getLogger(__name__)
 
 class BaseNode:
     """Base class for all research nodes"""
@@ -25,12 +28,17 @@ class ResearchPlanner(BaseNode):
     """Creates comprehensive research plan"""
     
     async def execute(self, state: ResearchState) -> ResearchState:
+        logger.info("~"*80)
+        logger.info("📋 NODE: RESEARCH PLANNER")
+        logger.info(f"🎯 Target: {state['target_entity']}")
+        logger.info("~"*80)
+        
         target = state["target_entity"]
         
         planning_prompt = f"""
         Create a comprehensive, multi-phase research plan for: {target}
         
-        Develop a strategic investigation covering these phases:
+        Develop a Strategic Research Plan covering these phases:
         
         PHASE 1: CORE IDENTIFICATION & VERIFICATION
         - Biographical data verification (age, education, background)
@@ -67,6 +75,8 @@ class ResearchPlanner(BaseNode):
         
         research_plan = self._parse_research_plan(research_plan_text)
         
+        logger.info(f"✅ Research Planner completed - Generated {len(research_plan)} plan items")
+        
         return {
             **state,
             "research_plan": research_plan,
@@ -91,6 +101,11 @@ class QueryGenerator(BaseNode):
     """Generates targeted search queries based on research context"""
     
     async def execute(self, state: ResearchState) -> ResearchState:
+        logger.info("~"*80)
+        logger.info("🔎 NODE: QUERY GENERATOR")
+        logger.info(f"🎯 Focus: {state.get('current_focus', 'comprehensive')}")
+        logger.info("~"*80)
+        
         current_focus = state.get("current_focus", "comprehensive")
         previous_queries = state.get("search_queries", [])
         existing_facts = state.get("extracted_facts", [])
@@ -104,7 +119,7 @@ class QueryGenerator(BaseNode):
         KNOWN FACTS: {[f['content'][:100] + '...' for f in existing_facts[-3:]] if existing_facts else "None"}
         KNOWLEDGE GAPS: {knowledge_gaps[-3:] if knowledge_gaps else "None"}
         
-        Create 3-5 highly specific search queries that will uncover new, verifiable information.
+        Create 3 highly specific search queries that will uncover new, verifiable information.
         Focus on filling knowledge gaps and verifying existing information.
         
         Consider these search strategies:
@@ -123,7 +138,13 @@ class QueryGenerator(BaseNode):
             system_message="You are an Expert Search Strategist skilled at crafting precise investigative queries."
         )
         
+        logger.info(f"Raw LLM queries response:\n{queries_text[:500]}...")
+        
         new_queries = self._parse_queries(queries_text)
+        
+        logger.info(f"✅ Query Generator completed - Generated {len(new_queries)} new queries")
+        for i, q in enumerate(new_queries, 1):
+            logger.info(f"   {i}. {q}")
         
         return {
             **state,
@@ -135,20 +156,56 @@ class QueryGenerator(BaseNode):
         lines = [line.strip() for line in queries_text.split('\n') if line.strip()]
         queries = []
         
+        import re
         for line in lines:
-            if line.startswith(('1.', '2.', '3.', '4.', '5.', '-', '•', '"')):
-                clean_query = line.split('.', 1)[-1].strip().lstrip('-•" ').rstrip('"')
+            # Match numbered lists: 1., 1), #1, etc.
+            if re.match(r'^[\d\*\-\•#]+[\.\):]?\s+', line):
+                # Remove the numbering/bullet
+                clean_query = re.sub(r'^[\d\*\-\•#]+[\.\):]?\s+', '', line)
+                # Remove quotes
+                clean_query = clean_query.strip('"').strip("'").strip()
                 if clean_query and len(clean_query) > 10:
                     queries.append(clean_query)
+                    logger.debug(f"Parsed query: {clean_query}")
         
-        return queries[:5]  # Limit to 5 queries
+        # If no queries found, try splitting by common patterns
+        if not queries:
+            logger.warning("No queries found with standard parsing, trying alternative parsing...")
+            # Look for lines that look like search queries (contain keywords)
+            for line in lines:
+                if any(keyword in line.lower() for keyword in ['search', 'find', 'query', 'look for', 'investigate']):
+                    continue  # Skip instruction lines
+                # If line is substantial and not a header, treat it as a query
+                if len(line) > 15 and not line.endswith(':') and not line.isupper():
+                    queries.append(line.strip('"').strip("'").strip())
+                    logger.debug(f"Alternative parsed query: {line}")
+        
+        result = queries[:5]  # Limit to 5 queries
+        logger.info(f"Total queries parsed: {len(result)}")
+        return result
 
 class DeepSearchExecutor(BaseNode):
     """Executes deep search using multiple search engines"""
     
     async def execute(self, state: ResearchState) -> ResearchState:
+        logger.info("~"*80)
+        logger.info("🌐 NODE: DEEP SEARCH EXECUTOR")
+        logger.info("📊 Executing latest queries")
+        logger.info("~"*80)
+        
         search_engine = DeepSearchEngine()
-        current_queries = state["search_queries"][-3:]  # Get latest queries
+        all_queries = state.get("search_queries", [])
+        current_queries = all_queries[-3:] if all_queries else []  # Get latest queries
+        
+        logger.info(f"Total queries in state: {len(all_queries)}")
+        logger.info(f"Queries to execute: {current_queries}")
+        
+        if not current_queries:
+            logger.warning("⚠️ No queries to execute! Skipping search.")
+            return {
+                **state,
+                "raw_search_results": state.get("raw_search_results", [])
+            }
         
         all_results = []
         for query in current_queries:
@@ -163,8 +220,10 @@ class DeepSearchExecutor(BaseNode):
                 await asyncio.sleep(1)
                 
             except Exception as e:
-                print(f"Search error for query '{query}': {e}")
+                logger.error(f"❌ Search error for query '{query}': {e}")
                 continue
+        
+        logger.info(f"✅ Deep Search completed - Retrieved {len(all_results)} total results")
         
         return {
             **state,
@@ -175,12 +234,19 @@ class FactExtractor(BaseNode):
     """Extracts structured facts from search results"""
     
     async def execute(self, state: ResearchState) -> ResearchState:
+        logger.info("~"*80)
+        logger.info("📝 NODE: FACT EXTRACTOR")
+        logger.info("📊 Processing search results")
+        logger.info("~"*80)
+        
         recent_results = state["raw_search_results"][-10:]  # Process recent results
         
         extracted_facts = []
         for result in recent_results:
             facts = await self._extract_facts_from_result(result, state["target_entity"])
             extracted_facts.extend(facts)
+        
+        logger.info(f"✅ Fact Extractor completed - Extracted {len(extracted_facts)} new facts")
         
         return {
             **state,
@@ -490,42 +556,37 @@ class RiskAssessor(BaseNode):
         DETECTED RED FLAGS:
         {flags_summary}
         
-        ASSESSMENT FRAMEWORK:
-        Analyze for these risk categories:
+        CRITICAL INSTRUCTIONS:
+        1. Identify DISTINCT, NON-OVERLAPPING risks only
+        2. DO NOT repeat the same risk in multiple categories
+        3. Consolidate related risks into ONE entry with comprehensive evidence
+        4. Provide HIGH SPECIFICITY - avoid generic descriptions
         
-        1. FINANCIAL RISKS
-           - Undisclosed liabilities, bankruptcy history
-           - Complex corporate structures hiding beneficial ownership
-           - Unusual financial patterns or transactions
-           
-        2. LEGAL & REGULATORY RISKS
-           - Litigation history, ongoing lawsuits
-           - Regulatory violations or investigations
-           - Compliance issues
-           
-        3. REPUTATION RISKS
-           - Past controversies or scandals
-           - Association with problematic entities/individuals
-           - Negative media coverage patterns
-           
-        4. OPERATIONAL RISKS
-           - Business practice concerns
-           - Track record of failed ventures
-           - Management stability issues
-           
-        5. POLITICAL/CONFLICT OF INTEREST RISKS
-           - Undisclosed political connections
-           - Potential conflicts of interest
-           - Foreign government ties
+        RISK CATEGORIES (Choose ONE per risk):
         
-        For each risk identified:
-        - Categorize severity (critical/high/medium/low)
-        - Provide specific evidence
-        - Assess confidence level (0-1)
-        - Estimate potential impact
+        1. FINANCIAL RISKS: Undisclosed liabilities, bankruptcy, fraud, complex corporate structures, unusual transactions
+        2. LEGAL_REGULATORY: Litigation, ongoing lawsuits, SEC/regulatory violations, investigations, compliance failures
+        3. REPUTATION: Past scandals, problematic associations, consistent negative media patterns
+        4. OPERATIONAL: Failed ventures, management instability, business practice concerns
+        5. POLITICAL_CONFLICT: Undisclosed political ties, conflicts of interest, foreign government connections
         
-        Return ONLY risks with solid factual basis.
-        Format each risk clearly with severity, description, and evidence.
+        OUTPUT FORMAT (JSON-style, one per risk):
+        {{
+          "category": "[FINANCIAL|LEGAL_REGULATORY|REPUTATION|OPERATIONAL|POLITICAL_CONFLICT]",
+          "severity": "[CRITICAL|HIGH|MEDIUM|LOW]",
+          "title": "[Brief specific title, max 60 chars]",
+          "description": "[Detailed description with specifics, no redundancy]",
+          "evidence": "[Specific facts supporting this risk]",
+          "confidence": [0.0-1.0]
+        }}
+        
+        QUALITY CHECKS:
+        - CRITICAL: Only for active legal issues, confirmed fraud, significant regulatory violations
+        - Confidence < 0.5: Don't include unless exceptionally important
+        - Each risk must have DIFFERENT core issue - no variations on same theme
+        - Prioritize specificity over quantity (5-8 DISTINCT risks maximum)
+        
+        Output only the risks in the format above, nothing else.
         """
         
         risk_text = await self.model_coordinator.generate_with_model(
@@ -537,68 +598,109 @@ class RiskAssessor(BaseNode):
         return self._parse_risks(risk_text)
     
     def _parse_risks(self, text: str) -> List[Dict]:
-        """Parse LLM response into structured risks"""
+        """Parse LLM response into structured risks with improved deduplication"""
+        logger.info(f"Parsing risk text: {text[:500]}...")
+        
         risks = []
-        lines = [line.strip() for line in text.split('\n') if line.strip()]
         
-        current_risk = None
-        
-        for line in lines:
-            # Look for severity indicators
-            if any(severity in line.lower() for severity in ['critical', 'high', 'medium', 'low', 'severity']):
-                if current_risk:
-                    risks.append(current_risk)
-                
-                # Determine severity
-                severity = "medium"
-                if "critical" in line.lower():
-                    severity = "critical"
-                elif "high" in line.lower():
-                    severity = "high"
-                elif "low" in line.lower():
-                    severity = "low"
-                
-                # Determine risk type
-                risk_type = "general"
-                if any(kw in line.lower() for kw in ['financial', 'bankruptcy', 'debt']):
-                    risk_type = "financial"
-                elif any(kw in line.lower() for kw in ['legal', 'lawsuit', 'litigation', 'regulatory']):
-                    risk_type = "legal_regulatory"
-                elif any(kw in line.lower() for kw in ['reputation', 'scandal', 'controversy']):
-                    risk_type = "reputation"
-                elif any(kw in line.lower() for kw in ['political', 'conflict']):
-                    risk_type = "political"
-                
-                # Extract confidence if mentioned
-                confidence = 0.7
-                conf_match = re.search(r'confidence[:\s]+(\d+\.?\d*)%?', line, re.IGNORECASE)
-                if conf_match:
-                    confidence = float(conf_match.group(1))
-                    if confidence > 1:
-                        confidence /= 100
-                
-                current_risk = {
-                    "id": f"risk_{uuid.uuid4().hex[:8]}",
-                    "type": risk_type,
-                    "severity": severity,
-                    "description": line,
-                    "evidence": [],
-                    "confidence": confidence,
-                    "impact": self._assess_impact(severity),
-                    "detected_at": datetime.now().isoformat()
-                }
+        # Try JSON parsing first (preferred format)
+        try:
+            import json
+            # Extract JSON objects from text
+            json_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
+            json_matches = re.findall(json_pattern, text, re.DOTALL)
             
-            elif current_risk and line and not line.startswith('#'):
-                # Add to current risk description or evidence
-                if len(current_risk["description"]) < 200:
-                    current_risk["description"] += " " + line
-                else:
-                    current_risk["evidence"].append(line)
+            for match in json_matches:
+                try:
+                    risk_obj = json.loads(match)
+                    if isinstance(risk_obj, dict) and 'severity' in risk_obj:
+                        # Standardize
+                        risks.append({
+                            "id": f"risk_{uuid.uuid4().hex[:8]}",
+                            "type": risk_obj.get('category', 'general').lower().replace(' ', '_'),
+                            "severity": risk_obj.get('severity', 'medium').lower(),
+                            "description": risk_obj.get('title', risk_obj.get('description', '')),
+                            "evidence": [risk_obj.get('evidence', '')] if risk_obj.get('evidence') else [],
+                            "confidence": float(risk_obj.get('confidence', 0.7)),
+                            "impact": self._assess_impact(risk_obj.get('severity', 'medium').lower()),
+                            "detected_at": datetime.now().isoformat()
+                        })
+                except json.JSONDecodeError:
+                    continue
+        except Exception as e:
+            logger.warning(f"JSON parsing failed: {e}, falling back to text parsing")
         
-        if current_risk:
-            risks.append(current_risk)
+        # Fallback to line-by-line parsing if JSON failed
+        if not risks:
+            lines = [line.strip() for line in text.split('\n') if line.strip()]
+            current_risk = None
+            
+            for line in lines:
+                # Skip headers and empty lines
+                if line.startswith('#') or len(line) < 10:
+                    continue
+                
+                # Look for risk indicators (but be strict)
+                if any(marker in line.lower() for marker in ['severity:', 'category:', 'risk:']):
+                    if current_risk and current_risk.get('description'):
+                        risks.append(current_risk)
+                    
+                    # Determine severity
+                    severity = "medium"
+                    if "critical" in line.lower():
+                        severity = "critical"
+                    elif "high" in line.lower():
+                        severity = "high"
+                    elif "low" in line.lower():
+                        severity = "low"
+                    
+                    # Determine risk type from category markers
+                    risk_type = "general"
+                    text_lower = line.lower()
+                    if "financial" in text_lower:
+                        risk_type = "financial"
+                    elif any(kw in text_lower for kw in ['legal', 'regulatory']):
+                        risk_type = "legal_regulatory"
+                    elif "reputation" in text_lower:
+                        risk_type = "reputation"
+                    elif "operational" in text_lower:
+                        risk_type = "operational"
+                    elif any(kw in text_lower for kw in ['political', 'conflict']):
+                        risk_type = "political_conflict"
+                    
+                    # Extract confidence
+                    confidence = 0.7
+                    conf_match = re.search(r'confidence[:\s]+(\d+\.?\d*)%?', line, re.IGNORECASE)
+                    if conf_match:
+                        confidence = float(conf_match.group(1))
+                        if confidence > 1:
+                            confidence /= 100
+                    
+                    current_risk = {
+                        "id": f"risk_{uuid.uuid4().hex[:8]}",
+                        "type": risk_type,
+                        "severity": severity,
+                        "description": "",
+                        "evidence": [],
+                        "confidence": confidence,
+                        "impact": self._assess_impact(severity),
+                        "detected_at": datetime.now().isoformat()
+                    }
+                
+                elif current_risk:
+                    # Accumulate description and evidence
+                    if not current_risk["description"]:
+                        current_risk["description"] = line
+                    elif len(current_risk["description"]) < 300:
+                        current_risk["description"] += " " + line
+                    else:
+                        current_risk["evidence"].append(line)
+            
+            if current_risk and current_risk.get('description'):
+                risks.append(current_risk)
         
-        return risks[:15]  # Limit risks
+        logger.info(f"Parsed {len(risks)} risks before deduplication")
+        return risks
     
     def _assess_impact(self, severity: str) -> str:
         """Assess potential impact based on severity"""
@@ -611,35 +713,89 @@ class RiskAssessor(BaseNode):
         return impact_map.get(severity, "Impact assessment pending.")
     
     def _deduplicate_risks(self, risks: List[Dict]) -> List[Dict]:
-        """Remove duplicate or highly similar risks"""
+        """Remove duplicate or highly similar risks with aggressive deduplication"""
         if not risks:
             return []
         
-        unique_risks = []
-        seen_descriptions = set()
+        logger.info(f"Deduplicating {len(risks)} risks...")
         
-        # Sort by severity (critical first)
+        unique_risks = []
+        seen_descriptions = []
+        
+        # Sort by confidence and severity (highest quality first)
         severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-        sorted_risks = sorted(risks, key=lambda r: severity_order.get(r.get("severity", "low"), 3))
+        sorted_risks = sorted(
+            risks, 
+            key=lambda r: (
+                severity_order.get(r.get("severity", "low"), 3),
+                -r.get("confidence", 0)  # Higher confidence first
+            )
+        )
         
         for risk in sorted_risks:
-            desc = risk.get("description", "").lower()
+            desc = risk.get("description", "").lower().strip()
+            
+            # Skip if too short or generic
+            if len(desc) < 20 or desc.count(' ') < 3:
+                logger.debug(f"Skipping generic risk: {desc[:50]}")
+                continue
             
             # Check for significant overlap with existing risks
             is_duplicate = False
             for seen_desc in seen_descriptions:
-                # Simple word overlap check
+                # Multiple similarity checks
                 desc_words = set(desc.split())
                 seen_words = set(seen_desc.split())
+                
+                # Word overlap
                 overlap = len(desc_words & seen_words) / max(len(desc_words), 1)
                 
-                if overlap > 0.6:  # 60% overlap = duplicate
+                # Substring check
+                substring_match = (desc in seen_desc or seen_desc in desc)
+                
+                # Key phrase extraction (SEC, fraud, investigation, etc.)
+                key_phrases = self._extract_key_phrases(desc)
+                seen_phrases = self._extract_key_phrases(seen_desc)
+                phrase_overlap = len(key_phrases & seen_phrases) / max(len(key_phrases), 1) if key_phrases else 0
+                
+                # Duplicate if:
+                # 1. High word overlap (>50%)
+                # 2. Substring match
+                # 3. Same key phrases (e.g., both about "SEC fraud")
+                if overlap > 0.5 or substring_match or phrase_overlap > 0.7:
                     is_duplicate = True
+                    logger.debug(f"Duplicate detected: '{desc[:50]}...' overlaps with '{seen_desc[:50]}...'")
                     break
             
             if not is_duplicate:
                 unique_risks.append(risk)
-                seen_descriptions.add(desc)
+                seen_descriptions.append(desc)
+        
+        logger.info(f"After deduplication: {len(unique_risks)} unique risks")
+        return unique_risks
+    
+    def _extract_key_phrases(self, text: str) -> set:
+        """Extract key phrases from risk description for better deduplication"""
+        text_lower = text.lower()
+        key_phrases = set()
+        
+        # Define important phrase patterns
+        patterns = [
+            r'sec\s+(?:charged|charges|investigation)',
+            r'fraud(?:\s+charges)?',
+            r'lawsuit(?:s)?',
+            r'investigation(?:s)?',
+            r'regulatory\s+(?:violation|issue)',
+            r'bankruptcy',
+            r'criminal\s+(?:charges|investigation)',
+            r'compliance\s+(?:violation|issue)',
+        ]
+        
+        for pattern in patterns:
+            matches = re.findall(pattern, text_lower)
+            key_phrases.update(matches)
+        
+        return key_phrases
         
         return unique_risks
 

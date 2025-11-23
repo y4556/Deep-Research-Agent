@@ -61,8 +61,9 @@ class ResearchReport(BaseModel):
     target_entity: str
     executive_summary: str
     key_findings: List[Fact]
-    risk_assessment: List[RiskFlag]
+    risk_assessment: Dict[str, Any]  # Changed from List[RiskFlag] to Dict to support frontend structure
     connection_network: List[Connection]
     confidence_scores: Dict[str, float]
     research_metadata: Dict[str, Any]
+    confidence_assessment: Optional[Dict[str, float]] = None  # Added for confidence metrics
     generated_at: str

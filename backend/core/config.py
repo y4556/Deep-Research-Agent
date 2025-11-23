@@ -1,19 +1,28 @@
 from pydantic_settings import BaseSettings
 from typing import List
 import os
+from pathlib import Path
+
+# Find the .env file in the project root
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+ENV_FILE = BASE_DIR / ".env"
 
 class Settings(BaseSettings):
-    # API Keys
-    OPENAI_API_KEY: str
-    ANTHROPIC_API_KEY: str
-    GOOGLE_API_KEY: str
-    TAVILY_API_KEY: str
-    SERPER_API_KEY: str
+    # 🆓 FREE API Keys (REQUIRED - No rate limits!)
+    GROQ_API_KEY: str        # Get free from https://console.groq.com
+    OPENROUTER_API_KEY: str  # Get free from https://openrouter.ai
+    TAVILY_API_KEY: str      # Get free from https://tavily.com (free tier: 1000 requests/month)
     
-    # LangSmith
-    LANGSMITH_API_KEY: str
+    # 💰 Optional API Keys (Leave empty if not using)
+    GOOGLE_API_KEY: str = ""
+    OPENAI_API_KEY: str = ""
+    ANTHROPIC_API_KEY: str = ""
+    SERPER_API_KEY: str = ""
+    
+    # LangSmith (Optional - for monitoring)
+    LANGSMITH_API_KEY: str = ""
     LANGSMITH_PROJECT: str = "deep-research-agent"
-    LANGCHAIN_TRACING_V2: bool = True
+    LANGCHAIN_TRACING_V2: bool = False  # Disabled by default
     LANGCHAIN_ENDPOINT: str = "https://api.smith.langchain.com"
     
     # Application
@@ -31,6 +40,9 @@ class Settings(BaseSettings):
     RATE_LIMIT_PERIOD: int = 60
     
     class Config:
-        env_file = ".env"
+        env_file = str(ENV_FILE)
+        env_file_encoding = 'utf-8'
+        extra = 'ignore'  # Ignore extra fields in .env file
+        case_sensitive = False  # Allow case-insensitive field names
 
 settings = Settings()

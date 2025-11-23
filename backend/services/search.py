@@ -1,43 +1,46 @@
 from langchain_community.tools import TavilySearchResults
-from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
 from typing import List, Dict, Any
 import asyncio
+import logging
 from core.config import settings
 
+logger = logging.getLogger(__name__)
+
 class DeepSearchEngine:
-    """Integrates multiple search engines for comprehensive research"""
+    """Search engine using Tavily API"""
     
     def __init__(self):
+        # Use Tavily as primary search engine
         self.tavily_tool = TavilySearchResults(
-            max_results=3,
+            max_results=5,
             api_key=settings.TAVILY_API_KEY
         )
-        self.ddg_search = DuckDuckGoSearchAPIWrapper()
     
     async def execute_deep_search(self, query: str, target_entity: str) -> List[Dict[str, Any]]:
-        """Execute search using multiple engines"""
+        """Execute search using Tavily API"""
+        # 🔍 LOG EVERY SEARCH QUERY
+        logger.info("="*80)
+        logger.info("🔎 SEARCH QUERY")
+        logger.info(f"🎯 Target: {target_entity}")
+        logger.info(f"📝 Query: {query}")
+        logger.info("="*80)
+        
         all_results = []
         
         try:
-            # Tavily Search (primary)
+            logger.info("🔍 Searching with Tavily...")
             tavily_results = await asyncio.get_event_loop().run_in_executor(
                 None, self.tavily_tool.invoke, {"query": f"{query} {target_entity}"}
             )
-            all_results.extend(self._process_tavily_results(tavily_results, query))
+            processed_results = self._process_tavily_results(tavily_results, query)
+            logger.info(f"✅ Tavily returned {len(processed_results)} results")
+            all_results.extend(processed_results)
             
         except Exception as e:
-            print(f"Tavily search error: {e}")
+            logger.error(f"❌ Tavily search error: {e}")
+            raise
         
-        try:
-            # DuckDuckGo as fallback
-            ddg_results = await asyncio.get_event_loop().run_in_executor(
-                None, self.ddg_search.run, f"{query} {target_entity}"
-            )
-            all_results.extend(self._process_ddg_results(ddg_results, query))
-            
-        except Exception as e:
-            print(f"DuckDuckGo search error: {e}")
-        
+        logger.info(f"📊 Total search results: {len(all_results)}")
         return all_results
     
     def _process_tavily_results(self, results: List[Dict], query: str) -> List[Dict[str, Any]]:
@@ -50,12 +53,7 @@ class DeepSearchEngine:
                 "url": result.get("url", ""),
                 "query": query,
                 "source": "tavily",
-                "confidence": 0.8,
+                "confidence": 0.9,  # Tavily provides high-quality results
                 "timestamp": "2024-01-01T00:00:00Z"  # Use actual timestamp
             })
         return processed
-    
-    def _process_ddg_results(self, results: str, query: str) -> List[Dict[str, Any]]:
-        """Process DuckDuckGo search results"""
-        # DDG returns string, need to parse
-        return []  # Implementation for parsing DDG results

@@ -2,75 +2,71 @@ import streamlit as st
 import requests
 import time
 import json
-import plotly.graph_objects as go
-import networkx as nx
-import pandas as pd
+import logging
 from datetime import datetime
-
-from components.research_input import research_input_component
-from components.results_display import results_display_component
-from components.visualizations import (
-    create_network_graph, 
-    create_risk_chart,
-    create_confidence_distribution,
-    create_category_breakdown,
-    create_source_credibility_chart
-)
-from components.session_manager import session_manager_component
 from utils.api_client import ResearchAPIClient
+from utils.pdf_generator import generate_pdf_report
+
+logger = logging.getLogger(__name__)
 
 # Page configuration
 st.set_page_config(
     page_title="Deep Research AI Agent",
     page_icon="🔍",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # Custom CSS
 st.markdown("""
 <style>
     .main-header {
-        font-size: 3rem;
+        font-size: 2.5rem;
         color: #1f77b4;
         text-align: center;
-        margin-bottom: 2rem;
+        margin-bottom: 1rem;
         font-weight: bold;
     }
-    .sub-header {
-        font-size: 1.5rem;
-        color: #2e86ab;
-        margin-bottom: 1rem;
+    .log-container {
+        background-color: #1e1e1e;
+        color: #00ff00;
+        padding: 20px;
+        border-radius: 10px;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9rem;
+        height: 400px;
+        overflow-y: auto;
+        margin: 20px 0;
     }
-    .risk-high { 
-        background-color: #ffcccc; 
-        padding: 10px; 
-        border-radius: 5px; 
-        border-left: 5px solid #ff4444;
+    .log-line {
+        margin: 5px 0;
+        line-height: 1.4;
     }
-    .risk-medium { 
-        background-color: #fff4cc; 
-        padding: 10px; 
-        border-radius: 5px; 
-        border-left: 5px solid #ffaa00;
+    .status-badge {
+        display: inline-block;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-weight: bold;
+        font-size: 0.9rem;
     }
-    .risk-low { 
-        background-color: #ccffcc; 
-        padding: 10px; 
-        border-radius: 5px; 
-        border-left: 5px solid #00cc00;
+    .status-researching {
+        background-color: #ffa50066;
+        color: #ff8800;
     }
-    .fact-card {
+    .status-completed {
+        background-color: #00cc0066;
+        color: #00cc00;
+    }
+    .status-error {
+        background-color: #ff444466;
+        color: #ff4444;
+    }
+    .report-section {
         background-color: #f8f9fa;
-        padding: 15px;
-        border-radius: 8px;
+        padding: 20px;
+        border-radius: 10px;
         border-left: 4px solid #1f77b4;
-        margin-bottom: 10px;
-    }
-    .connection-node {
-        fill: #1f77b4;
-        stroke: #fff;
-        stroke-width: 2px;
+        margin: 15px 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -79,134 +75,251 @@ def main():
     # Initialize API client
     api_client = ResearchAPIClient()
     
+    # Initialize session state
+    if 'target_entity' not in st.session_state:
+        st.session_state.target_entity = ""
+    if 'current_session_id' not in st.session_state:
+        st.session_state.current_session_id = None
+    if 'research_status' not in st.session_state:
+        st.session_state.research_status = None
+    if 'logs' not in st.session_state:
+        st.session_state.logs = []
+    if 'auto_refresh' not in st.session_state:
+        st.session_state.auto_refresh = True
+    
+    # Session recovery in sidebar
+    with st.sidebar:
+        st.markdown("### 🔄 Resume Session")
+        session_id_input = st.text_input("Enter Session ID", placeholder="e.g., abc123...")
+        if st.button("Load Session", use_container_width=True):
+            if session_id_input:
+                st.session_state.current_session_id = session_id_input
+                st.rerun()
+    
     # Header
-    st.markdown('<div class="main-header">Deep Research AI Agent</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">🔍 Deep Research AI Agent</div>', unsafe_allow_html=True)
+    st.markdown("**Comprehensive Due Diligence Research powered by AI**")
     st.markdown("---")
     
-    # Sidebar
-    with st.sidebar:
-        st.header("🔧 Configuration")
-        
-        # Research settings
-        max_depth = st.slider("Research Depth", 1, 5, 3, 
-                             help="How deep the research should go (more depth = more comprehensive but slower)")
-        
-        research_focus = st.selectbox(
-            "Research Focus",
-            ["Comprehensive", "Financial", "Legal", "Professional", "Personal", "Reputation"],
-            help="Focus area for the research"
+    # === INPUT SECTION ===
+    col_input1, col_input2 = st.columns([3, 1])
+    
+    with col_input1:
+        target_entity = st.text_input(
+            "Target Entity (Person or Organization)",
+            value=st.session_state.target_entity,
+            placeholder="e.g., Timothy Overturf, John Smith - CEO of TechCorp",
+            disabled=st.session_state.current_session_id is not None
         )
-        
-        st.markdown("---")
-        st.header("Test Personas")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Timothy Overturf", use_container_width=True):
-                st.session_state.target_entity = "Timothy Overturf"
-                st.session_state.research_focus = "Comprehensive"
-                st.rerun()
-        
-        with col2:
-            if st.button("John Doe", use_container_width=True):
-                st.session_state.target_entity = "John Doe - Tech Executive"
-                st.session_state.research_focus = "Professional"
-                st.rerun()
-        
-        st.markdown("---")
-        st.header("📊 Session Management")
-        session_manager_component(api_client)
     
-    # Main content tabs
-    tab1, tab2, tab3, tab4 = st.tabs(["🚀 Research Launch", "📈 Live Results", "🔍 Analysis", "📋 Session History"])
-    
-    with tab1:
-        research_input_component(api_client, max_depth, research_focus)
-    
-    with tab2:
-        if 'current_session_id' in st.session_state:
-            results_display_component(api_client, st.session_state.current_session_id)
-        else:
-            st.info("Start a research session to see live results and progress")
-            st.image("https://via.placeholder.com/600x300?text=Deep+Research+Analysis", use_column_width=True)
-    
-    with tab3:
-        st.header("Advanced Analysis Tools")
-        
-        # Try to load current report data
-        report_data = None
-        if 'current_session_id' in st.session_state:
-            try:
-                status = api_client.get_session_status(st.session_state.current_session_id)
-                if status and status.get("status") == "completed":
-                    report_data = api_client.get_research_report(st.session_state.current_session_id)
-            except:
-                pass
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.subheader("🕸️ Connection Network")
-            connections = report_data.get("connection_network", []) if report_data else None
-            network_fig = create_network_graph(connections)
-            st.plotly_chart(network_fig, use_container_width=True)
-            
-            st.subheader("📊 Fact Confidence Distribution")
-            facts = report_data.get("key_findings", []) if report_data else None
-            conf_fig = create_confidence_distribution(facts)
-            st.plotly_chart(conf_fig, use_container_width=True)
-        
-        with col2:
-            st.subheader("⚠️ Risk Assessment")
-            risks = []
-            if report_data and report_data.get("risk_assessment"):
-                risk_assessment = report_data["risk_assessment"]
-                risks = (risk_assessment.get("critical_risks", []) +
-                        risk_assessment.get("high_risks", []) +
-                        risk_assessment.get("medium_risks", []) +
-                        risk_assessment.get("low_risks", []))
-            risk_fig = create_risk_chart(risks)
-            st.plotly_chart(risk_fig, use_container_width=True)
-            
-            st.subheader("🔍 Source Verification")
-            if facts:
-                verified = sum(1 for f in facts if f.get("verified", False))
-                st.metric("Verified Facts", verified, f"{len(facts) - verified} unverified")
+    with col_input2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔍 Start Research", type="primary", use_container_width=True, 
+                     disabled=st.session_state.current_session_id is not None):
+            if target_entity and len(target_entity.strip()) >= 3:
+                with st.spinner("Initiating research..."):
+                    try:
+                        request_data = {
+                            "target_entity": target_entity,
+                            "max_depth": 3,
+                            "research_focus": None,
+                            "additional_context": {}
+                        }
+                        response = api_client.start_research(request_data)
+                        
+                        if response and response.get("session_id"):
+                            st.session_state.current_session_id = response["session_id"]
+                            st.session_state.target_entity = target_entity
+                            st.session_state.logs = [f"[{datetime.now().strftime('%H:%M:%S')}] 🚀 Research initiated for: {target_entity}"]
+                            st.success(f"✅ Research started! Session: {response['session_id'][:8]}")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("Failed to start research")
+                    except Exception as e:
+                        st.error(f"Error: {str(e)}")
             else:
-                st.info("No data available yet")
-        
-        # Category breakdown
-        st.markdown("---")
-        st.subheader("📋 Facts by Category")
-        if facts:
-            cat_fig = create_category_breakdown(facts)
-            st.plotly_chart(cat_fig, use_container_width=True)
-        else:
-            st.info("Complete a research session to see analysis")
+                st.warning("Please enter a valid target entity (at least 3 characters)")
     
-    with tab4:
-        st.header("Research Session History")
+    # === LIVE RESULTS SECTION ===
+    if st.session_state.current_session_id:
+        st.markdown("---")
         
+        # Auto-refresh toggle
+        col_toggle1, col_toggle2, col_toggle3 = st.columns([2, 1, 1])
+        with col_toggle1:
+            st.session_state.auto_refresh = st.checkbox("🔄 Auto-refresh (every 3 seconds)", value=st.session_state.auto_refresh)
+        
+        with col_toggle2:
+            if st.button("🔄 Refresh Now", use_container_width=True):
+                st.rerun()
+        
+        with col_toggle3:
+            if st.button("⏹️ New Research", use_container_width=True):
+                st.session_state.current_session_id = None
+                st.session_state.research_status = None
+                st.session_state.logs = []
+                st.session_state.target_entity = ""
+                st.rerun()
+        
+        # Fetch current status
         try:
-            sessions = api_client.list_sessions()
-            if sessions:
-                sessions_df = pd.DataFrame(sessions)
-                st.dataframe(sessions_df, use_container_width=True)
+            status = api_client.get_session_status(st.session_state.current_session_id)
+            
+            if status:
+                st.session_state.research_status = status
                 
-                # Session details
-                selected_session = st.selectbox(
-                    "Select session for details",
-                    [s["session_id"] for s in sessions]
-                )
+                # Status header
+                col_s1, col_s2, col_s3, col_s4 = st.columns(4)
                 
-                if selected_session:
-                    session_details = api_client.get_session_status(selected_session)
-                    st.json(session_details)
-            else:
-                st.info("No research sessions yet. Start one in the Research Launch tab.")
+                with col_s1:
+                    status_text = status.get('status', 'unknown').upper()
+                    status_class = f"status-{status.get('status', 'unknown')}"
+                    st.markdown(f'<span class="status-badge {status_class}">{status_text}</span>', unsafe_allow_html=True)
                 
+                with col_s2:
+                    st.metric("Progress", f"{status.get('progress', 0):.0f}%")
+                
+                with col_s3:
+                    st.metric("Facts Found", status.get('findings_count', 0))
+                
+                with col_s4:
+                    st.metric("Risks Identified", status.get('risks_identified', 0))
+                
+                # Progress bar
+                if status.get('status') in ['researching', 'initializing']:
+                    progress = status.get('progress', 0) / 100
+                    st.progress(progress if progress > 0 else 0.1)
+                
+                # Current step
+                if status.get('current_step'):
+                    step_name = status['current_step'].replace('_', ' ').title()
+                    st.info(f"**Current Step:** {step_name}")
+                
+                # === LIVE LOGS SECTION ===
+                st.subheader("📋 Live Backend Logs")
+                
+                # Fetch REAL backend logs
+                try:
+                    logs_response = api_client.get_session_logs(st.session_state.current_session_id, last_n=50)
+                    
+                    if logs_response and logs_response.get('logs'):
+                        backend_logs = logs_response['logs']
+                        
+                        # Display logs
+                        log_html = '<div class="log-container">'
+                        for log in backend_logs:
+                            log_html += f'<div class="log-line">{log}</div>'
+                        log_html += '</div>'
+                        st.markdown(log_html, unsafe_allow_html=True)
+                    else:
+                        # Fallback to simple messages if logs not available
+                        current_step = status.get('current_step', '')
+                        st.info(f"Backend is working on: {current_step.replace('_', ' ').title()}" if current_step else "Initializing...")
+                
+                except Exception as log_error:
+                    # Fallback display
+                    logger.warning(f"Could not fetch logs: {log_error}")
+                    st.info(f"Backend Status: {status.get('status', 'unknown').upper()} - {status.get('current_step', 'processing').replace('_', ' ').title()}")
+                
+                # === RESULTS DISPLAY ===
+                if status.get('status') == 'completed':
+                    st.success("✅ **Research Complete!**")
+                    
+                    try:
+                        report = api_client.get_research_report(st.session_state.current_session_id)
+                        
+                        if report:
+                            # Display quick summary
+                            st.markdown("---")
+                            st.subheader("📊 Research Summary")
+                            
+                            col_sum1, col_sum2, col_sum3 = st.columns(3)
+                            
+                            with col_sum1:
+                                total_facts = len(report.get('key_findings', []))
+                                st.metric("Total Facts", total_facts)
+                            
+                            with col_sum2:
+                                risk_level = report.get('risk_assessment', {}).get('overall_risk_level', 'unknown').upper()
+                                st.metric("Risk Level", risk_level)
+                            
+                            with col_sum3:
+                                connections = len(report.get('connection_network', []))
+                                st.metric("Connections Mapped", connections)
+                            
+                            # Executive Summary
+                            st.markdown("---")
+                            st.subheader("📋 Executive Summary")
+                            st.markdown(report.get('executive_summary', 'No summary available'))
+                            
+                            # Download button
+                            st.markdown("---")
+                            col_dl1, col_dl2, col_dl3 = st.columns([1, 2, 1])
+                            
+                            with col_dl2:
+                                if st.button("📥 Download Full Report (PDF)", type="primary", use_container_width=True):
+                                    with st.spinner("Generating PDF report..."):
+                                        try:
+                                            pdf_bytes = generate_pdf_report(report)
+                                            
+                                            st.download_button(
+                                                label="📄 Download Report",
+                                                data=pdf_bytes,
+                                                file_name=f"research_report_{st.session_state.target_entity.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                                                mime="application/pdf",
+                                                use_container_width=True
+                                            )
+                                            st.success("✅ PDF generated successfully!")
+                                        except Exception as e:
+                                            st.error(f"Error generating PDF: {str(e)}")
+                    
+                    except Exception as e:
+                        st.error(f"Error loading report: {str(e)}")
+                
+                elif status.get('status') == 'error':
+                    st.error("❌ **Research encountered an error**")
+                    if status.get('error'):
+                        st.exception(status['error'])
+                
+                # Auto-refresh
+                if st.session_state.auto_refresh and status.get('status') in ['researching', 'initializing']:
+                    time.sleep(3)
+                    st.rerun()
+        
         except Exception as e:
-            st.error(f"Error loading sessions: {e}")
+            st.error(f"Error fetching status: {str(e)}")
+    
+    else:
+        # Show welcome message
+        st.info("👆 Enter a target entity above and click 'Start Research' to begin")
+        
+        st.markdown("---")
+        st.subheader("📊 What You'll Get")
+        
+        col_feature1, col_feature2, col_feature3 = st.columns(3)
+        
+        with col_feature1:
+            st.markdown("""
+            **🔍 Biographical & Professional Details**
+            
+            Verified personal details, career trajectory, and professional history.
+            """)
+        
+        with col_feature2:
+            st.markdown("""
+            **🕸️ Connection Mapping**
+            
+            Structured map of relationships, organizations, and entities.
+            """)
+        
+        with col_feature3:
+            st.markdown("""
+            **⚠️ Risk Assessment**
+            
+            Identification of red flags, inconsistencies, and potential risks.
+            """)
 
 if __name__ == "__main__":
     main()
+

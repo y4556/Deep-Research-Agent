@@ -2,24 +2,35 @@ from langsmith import Client
 from langsmith.schemas import Run, Example
 from typing import Dict, Any, List, Optional
 import uuid
+import logging
 from datetime import datetime
 from core.config import settings
+
+logger = logging.getLogger(__name__)
 
 class LangSmithClient:
     """Client for LangSmith integration and monitoring"""
     
     def __init__(self):
-        self.client = Client(
-            api_key=settings.LANGSMITH_API_KEY
-        )
-        self.project_name = settings.LANGSMITH_PROJECT
+        self.enabled = bool(settings.LANGSMITH_API_KEY and settings.LANGCHAIN_TRACING_V2)
+        if self.enabled:
+            self.client = Client(api_key=settings.LANGSMITH_API_KEY)
+            self.project_name = settings.LANGSMITH_PROJECT
+        else:
+            self.client = None
+            self.project_name = None
     
     async def initialize(self):
         """Initialize LangSmith client"""
-        print(f"🔍 LangSmith initialized for project: {self.project_name}")
+        if not self.enabled:
+            logger.info("🔍 LangSmith is disabled (no API key or tracing disabled)")
+            return
+        logger.info(f"🔍 LangSmith initialized for project: {self.project_name}")
     
     async def start_research_session(self, session_id: str, target_entity: str) -> Dict[str, Any]:
         """Start a new research session in LangSmith"""
+        if not self.enabled:
+            return {"session_id": session_id}
         try:
             session_data = {
                 "session_id": session_id,
@@ -40,11 +51,13 @@ class LangSmithClient:
             return session_data
             
         except Exception as e:
-            print(f"LangSmith session start error: {e}")
+            logger.warning(f"LangSmith session start error: {e}")
             return {"session_id": session_id}
     
     async def log_node_execution(self, session_id: str, node_name: str, inputs: Dict, outputs: Dict):
         """Log node execution to LangSmith"""
+        if not self.enabled:
+            return
         try:
             run = Run(
                 name=f"Research Node: {node_name}",
@@ -58,10 +71,12 @@ class LangSmithClient:
             self.client.create_run(run)
             
         except Exception as e:
-            print(f"LangSmith logging error for {node_name}: {e}")
+            logger.warning(f"LangSmith logging error for {node_name}: {e}")
     
     async def complete_research_session(self, session_id: str, final_state: Dict[str, Any]):
         """Mark research session as completed"""
+        if not self.enabled:
+            return
         try:
             # Log final results
             run = Run(
@@ -74,13 +89,15 @@ class LangSmithClient:
             )
             
             self.client.create_run(run)
-            print(f"✅ Research session {session_id} completed and logged to LangSmith")
+            logger.info(f"✅ Research session {session_id} completed and logged to LangSmith")
             
         except Exception as e:
-            print(f"LangSmith completion error: {e}")
+            logger.warning(f"LangSmith completion error: {e}")
     
     async def error_research_session(self, session_id: str, error: str):
         """Log research session error"""
+        if not self.enabled:
+            return
         try:
             run = Run(
                 name="Research Session Error",
@@ -94,8 +111,10 @@ class LangSmithClient:
             self.client.create_run(run)
             
         except Exception as e:
-            print(f"LangSmith error logging error: {e}")
+            logger.warning(f"LangSmith error logging error: {e}")
     
     async def cleanup(self):
         """Cleanup LangSmith client"""
-        print("🧹 LangSmith client cleaned up")
+        if not self.enabled:
+            return
+        logger.info("🧹 LangSmith client cleaned up")
