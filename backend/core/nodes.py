@@ -36,41 +36,159 @@ class ResearchPlanner(BaseNode):
         target = state["target_entity"]
         
         planning_prompt = f"""
-        Create a comprehensive, multi-phase research plan for: {target}
-        
-        Develop a Strategic Research Plan covering these phases:
-        
-        PHASE 1: CORE IDENTIFICATION & VERIFICATION
-        - Biographical data verification (age, education, background)
-        - Professional credentials and employment history
-        - Digital footprint and online presence
-        
-        PHASE 2: FINANCIAL & BUSINESS INVESTIGATION  
-        - Company affiliations and business relationships
-        - Financial interests and investment patterns
-        - Regulatory compliance and legal history
-        - Tax liens, bankruptcies, or financial disputes
-        
-        PHASE 3: NETWORK & RELATIONSHIP MAPPING
-        - Professional associations and memberships
-        - Personal relationships and family connections
-        - Political affiliations and donations
-        - Organizational board memberships
-        
-        PHASE 4: RISK & REPUTATION ASSESSMENT
-        - Litigation history and legal controversies
-        - Regulatory sanctions or investigations
-        - Reputation indicators and public perception
-        - Conflict of interest analysis
-        
-        Return a structured, actionable research plan with specific investigation areas.
-        Focus on uncovering hidden connections and potential risks.
-        """
+You are conducting comprehensive due diligence research on: "{target}"
+
+TASK: Create a strategic, multi-phase research plan that will uncover all relevant information about this entity (whether it's an individual person or an organization/company).
+
+STEP 1 - IDENTIFY ENTITY TYPE:
+First, determine if the target is:
+- An INDIVIDUAL (person, executive, public figure)
+- An ORGANIZATION (company, nonprofit, institution, government entity)
+
+STEP 2 - DEVELOP CUSTOMIZED RESEARCH PLAN:
+
+For INDIVIDUALS, investigate:
+PHASE 1: CORE IDENTITY & VERIFICATION
+- Full name verification and aliases
+- Date of birth, nationality, residence locations
+- Educational background (degrees, institutions, years)
+- Professional licenses and certifications
+- Digital footprint (social media, publications, interviews)
+
+PHASE 2: PROFESSIONAL & EMPLOYMENT HISTORY
+- Complete career timeline with dates
+- Companies worked for (roles, tenure, achievements)
+- Board memberships and advisory positions
+- Business ownership stakes and partnerships
+- Income sources and compensation history
+
+PHASE 3: FINANCIAL ANALYSIS
+- Personal wealth indicators and assets
+- Investment portfolio and holdings
+- Business interests and equity stakes
+- Loans, liens, bankruptcies, tax issues
+- Real estate ownership and transactions
+
+PHASE 4: NETWORK & RELATIONSHIPS
+- Family members and personal relationships
+- Professional associates and mentors
+- Political connections and donations
+- Club memberships and social circles
+- Co-investors and business partners
+
+PHASE 5: LEGAL & REGULATORY REVIEW
+- Civil litigation history (plaintiff/defendant)
+- Criminal records or investigations
+- Regulatory sanctions or fines
+- Patent disputes or IP issues
+- Divorce, custody, or family legal matters
+
+PHASE 6: REPUTATION & RISK ASSESSMENT
+- Media coverage and public perception
+- Controversies, scandals, or negative press
+- Conflicts of interest
+- Ethical concerns or misconduct allegations
+- Social media behavior and statements
+
+For ORGANIZATIONS, investigate:
+PHASE 1: CORPORATE IDENTITY & STRUCTURE
+- Legal entity name, registration details, jurisdiction
+- Corporate structure and ownership hierarchy
+- Subsidiaries, parent companies, affiliated entities
+- Business registration numbers and tax IDs
+- Operating history and evolution
+
+PHASE 2: LEADERSHIP & GOVERNANCE
+- Board of directors (names, backgrounds, tenure)
+- Executive team (CEO, CFO, CTO, etc.)
+- Major shareholders and beneficial owners
+- Changes in leadership (departures, hires)
+- Governance structure and policies
+
+PHASE 3: FINANCIAL PERFORMANCE
+- Revenue, profitability, growth trends
+- Funding rounds and investor information
+- Financial statements and SEC filings
+- Debt obligations and credit rating
+- Bankruptcies, restructurings, or financial distress
+
+PHASE 4: BUSINESS OPERATIONS
+- Products/services offered and market position
+- Customer base and key clients
+- Supplier relationships and dependencies
+- Competitive landscape and market share
+- Expansion plans and strategic initiatives
+
+PHASE 5: LEGAL & COMPLIANCE
+- Regulatory licenses and permits
+- Compliance with industry regulations
+- Litigation history (lawsuits, settlements)
+- Regulatory investigations or sanctions
+- IP portfolio (patents, trademarks)
+
+PHASE 6: REPUTATION & RISK FACTORS
+- Media coverage and industry reputation
+- Customer reviews and COMPLAINTS
+- Employee reviews and workplace culture
+- Environmental, social, governance (ESG) issues
+- CONTROVERSIES, SCANDALS, or PR CRISIS
+
+STEP 3 - PRIORITIZE INVESTIGATION AREAS:
+Rank the most critical investigation areas (high, medium, low priority) based on:
+- Likelihood of finding material information
+- Risk exposure potential
+- Relevance to due diligence objectives
+
+===== FEW-SHOT EXAMPLES =====
+
+EXAMPLE 1 - INDIVIDUAL:
+Input: "Elon Musk"
+Reasoning: Elon Musk is a high-profile individual entrepreneur. I need to investigate his multiple business interests, wealth sources, legal issues, and public controversies.
+Output:
+1. Verify educational background (University of Pennsylvania, Stanford dropout)
+2. Document CEO roles (Tesla, SpaceX, X/Twitter) with timelines
+3. Map business network (Peter Thiel, Larry Ellison, other PayPal mafia)
+4. Review SEC investigations and legal settlements
+5. Assess Twitter acquisition controversy and management style
+6. Examine political donations and regulatory relationships
+7. Investigate personal relationships and family dynamics
+
+EXAMPLE 2 - ORGANIZATION:
+Input: "FTX"
+Reasoning: FTX is a cryptocurrency company. Given recent industry volatility, I must investigate financial stability, regulatory compliance, and leadership credibility.
+Output:
+1. Verify corporate registration (Bahamas) and entity structure
+2. Identify leadership team (Sam Bankman-Fried as CEO, executives)
+3. Analyze funding rounds ($2B+ raised, Sequoia, SoftBank investors)
+4. Investigate regulatory licenses (CFTC, state money transmitter licenses)
+5. Examine customer fund handling and segregation practices
+6. Map relationships with Alameda Research (sister company)
+7. Assess bankruptcy proceedings and fraud allegations
+
+
+===== YOUR TASK =====
+
+Now create a detailed, prioritized research plan for: "{target}"
+
+REASONING (Chain of Thought):
+1. Is this an individual or organization?
+2. What are the Highest Risk areas to investigate?
+3. What specific, actionable investigation steps should be taken?
+
+OUTPUT FORMAT (8-10 specific investigation tasks):
+1. [Specific investigation task with concrete details]
+2. [Specific investigation task with concrete details]
+...
+
+Focus on: Hidden connections, undisclosed conflicts, financial irregularities, legal risks, and reputation concerns.
+"""
         
         research_plan_text = await self.model_coordinator.generate_with_model(
             task_type="planning",
             prompt=planning_prompt,
-            system_message="You are an Expert Investigative Researcher with deep expertise in due diligence and risk assessment."
+            system_message="""You are a Outstanding Investigative Researcher and Due Diligence Expert with 20+ years of experience. 
+You excel at uncovering hidden risks, identifying red flags, and creating comprehensive investigation strategies.
+Your approach is methodical, thorough, and always produces actionable intelligence."""
         )
         
         research_plan = self._parse_research_plan(research_plan_text)
@@ -112,30 +230,100 @@ class QueryGenerator(BaseNode):
         knowledge_gaps = state.get("knowledge_gaps", [])
         
         query_prompt = f"""
-        Generate specific, actionable search queries for: {state['target_entity']}
-        
-        CURRENT RESEARCH FOCUS: {current_focus}
-        PREVIOUS QUERIES (last 5): {previous_queries[-5:] if previous_queries else "None"}
-        KNOWN FACTS: {[f['content'][:100] + '...' for f in existing_facts[-3:]] if existing_facts else "None"}
-        KNOWLEDGE GAPS: {knowledge_gaps[-3:] if knowledge_gaps else "None"}
-        
-        Create 3 highly specific search queries that will uncover new, verifiable information.
-        Focus on filling knowledge gaps and verifying existing information.
-        
-        Consider these search strategies:
-        - Specific document searches (court records, SEC filings, patents)
-        - Location-based searches (specific cities, regions)
-        - Time-bound searches (specific years, date ranges)
-        - Relationship searches (specific people, organizations)
-        - Database-specific queries (professional directories, regulatory databases)
-        
-        Make queries precise and likely to return authoritative sources.
-        """
+You are generating search queries to investigate: "{state['target_entity']}"
+
+===== CONTEXT =====
+RESEARCH FOCUS: {current_focus}
+PREVIOUS QUERIES: {previous_queries[-5:] if previous_queries else "None - This is the first search"}
+KNOWN FACTS: {[f['content'][:100] + '...' for f in existing_facts[-3:]] if existing_facts else "No facts discovered yet"}
+KNOWLEDGE GAPS: {knowledge_gaps[-3:] if knowledge_gaps else "Initial investigation phase"}
+
+===== TASK =====
+Generate 3 HIGHLY SPECIFIC search queries that will uncover NEW, VERIFIABLE information about this entity.
+
+STEP 1 - ANALYZE WHAT WE NEED:
+- What critical information is still missing?
+- What facts need verification from additional sources?
+- What areas have not been explored yet?
+- What specific documents or records would provide authoritative data?
+
+STEP 2 - CRAFT STRATEGIC QUERIES:
+Use these advanced search strategies:
+
+For INDIVIDUALS:
+✓ Official Records: "SEC Form 4 filings [Name]", "USPTO patent inventor [Name]", "[Name] professional license [State]"
+✓ Legal Documents: "[Name] lawsuit plaintiff", "[Name] vs defendant case", "[Name] settlement agreement"
+✓ Business Relationships: "[Name] board member company", "[Name] investor portfolio", "[Name] co-founder startup"
+✓ Educational Background: "[Name] [University] alumni", "[Name] degree [Field] [Year]", "[Name] thesis dissertation"
+✓ Media & Reputation: "[Name] interview [Topic]", "[Name] controversy scandal", "[Name] [Industry] expert"
+✓ Location-Specific: "[Name] [City] property records", "[Name] [State] voter registration", "[Name] [County] court records"
+
+For ORGANIZATIONS:
+✓ Corporate Records: "[Company] SEC 10-K filing", "[Company] articles of incorporation", "[Company] Delaware entity"
+✓ Financial Data: "[Company] revenue 2023", "[Company] funding round Series", "[Company] IPO prospectus"
+✓ Leadership: "[Company] CEO [Name]", "[Company] board of directors", "[Company] executive team"
+✓ Legal/Regulatory: "[Company] FTC complaint", "[Company] class action lawsuit", "[Company] regulatory fine"
+✓ Operations: "[Company] customer reviews", "[Company] Glassdoor reviews", "[Company] competitors analysis"
+✓ Industry-Specific: "[Company] FDA approval", "[Company] patent portfolio", "[Company] acquisition merger"
+
+STEP 3 - AVOID DUPLICATE QUERIES:
+DO NOT repeat previous queries. FIND NEW angles to investigate.
+
+===== FEW-SHOT EXAMPLES =====
+
+EXAMPLE 1 - Individual (First Iteration):
+Target: "Elizabeth Holmes"
+Focus: Biographical verification
+Previous Queries: None
+Known Facts: None
+Gaps: Everything unknown
+
+Reasoning: Need to establish basic identity, education, and career foundation first.
+Queries:
+1. Elizabeth Holmes Stanford University dropout 2003 2004
+2. Elizabeth Holmes Theranos founder CEO Silicon Valley
+3. Elizabeth Holmes net worth Forbes youngest billionaire
+
+EXAMPLE 2 - Individual (Second Iteration):
+Target: "Elizabeth Holmes"
+Focus: Legal and regulatory review
+Previous Queries: ["Elizabeth Holmes Stanford dropout", "Theranos founder CEO"]
+Known Facts: ["Dropped out of Stanford in 2004", "Founded Theranos in 2003"]
+Gaps: Legal issues, fraud allegations, trial outcome
+
+Reasoning: Basic bio established. Now need legal/criminal information.
+Queries:
+1. Elizabeth Holmes SEC fraud charges 2018 settlement
+2. Elizabeth Holmes trial verdict guilty wire fraud
+3. Elizabeth Holmes sentencing prison sentence 2022
+
+===== YOUR TASK =====
+
+Target Entity: "{state['target_entity']}"
+
+REASONING (Chain of Thought):
+1. Based on what we already know, what are the 3 most important gaps to fill?
+2. What specific documents or records would provide authoritative verification?
+3. What search queries will return the highest-quality, most credible sources?
+
+OUTPUT (3-5 queries):
+1. [Specific, targeted query with key details]
+2. [Specific, targeted query with key details]
+3. [Specific, targeted query with key details]
+
+QUALITY CHECKS:
+✓ Queries are specific (not generic)
+✓ Queries target authoritative sources (SEC, court records, official databases)
+✓ Queries AVOID DUPLICATING PREVIOUS SEARCHES
+✓ Queries FILL IDENTIFIED KNOWLEDGE GAPS
+✓ Queries ARE OPTIMIZED FOR SEARCH ENGINES
+"""
         
         queries_text = await self.model_coordinator.generate_with_model(
             task_type="query_generation",
             prompt=query_prompt,
-            system_message="You are an Expert Search Strategist skilled at crafting precise investigative queries."
+            system_message="""You are an elite OSINT (Open Source Intelligence) researcher and search strategist with 15+ years of experience.
+Your queries consistently uncover information that others miss."""
         )
         
         logger.info(f"Raw LLM queries response:\n{queries_text[:500]}...")
@@ -256,32 +444,52 @@ class FactExtractor(BaseNode):
     async def _extract_facts_from_result(self, result: Dict, target_entity: str) -> List[Dict]:
         """Extract facts from a single search result"""
         extraction_prompt = f"""
-        Extract verifiable facts about {target_entity} from this search result:
-        
-        TITLE: {result.get('title', 'N/A')}
-        CONTENT: {result.get('content', 'N/A')}
-        URL: {result.get('url', 'N/A')}
-        
-        Extract structured facts in these categories:
-        - Personal Background (birth, education, family)
-        - Professional History (jobs, positions, companies)
-        - Financial Information (investments, companies, wealth indicators)
-        - Legal & Regulatory (lawsuits, investigations, compliance)
-        - Relationships & Associations (people, organizations, memberships)
-        - Reputation & Behavior (awards, controversies, public perception)
-        
-        For each fact, assess:
-        - Confidence level (0.0-1.0) based on source credibility
-        - Specificity and verifiability
-        - Relevance to comprehensive risk assessment
-        
-        Return only high-confidence, verifiable facts.
-        """
+You are extracting verifiable facts about "{target_entity}" (individual OR organization) from a search result.
+
+===== SOURCE DOCUMENT =====
+TITLE: {result.get('title', 'N/A')}
+CONTENT: {result.get('content', 'N/A')}
+URL: {result.get('url', 'N/A')}
+
+TASK: Extract ONLY factual, verifiable information. NO inference or speculation.
+
+CATEGORIES (select appropriate):
+For INDIVIDUALS: Biographical, Education, Employment, Financial, Legal, Relationships, Reputation
+For ORGANIZATIONS: Corporate, Leadership, Financial, Operations, Legal, Ownership, Reputation
+
+CONFIDENCE LEVELS:
+0.9-1.0: Official records (SEC, court, government)
+0.7-0.9: Reputable news with quotes/documentation
+0.5-0.7: Industry publications, verified profiles
+0.3-0.5: Unverified claims
+
+FEW-SHOT EXAMPLES:
+
+Example 1: "Graduated from MIT with B.S. in Computer Science in 2010"
+→ FACT: Graduated from MIT with B.S. in Computer Science in 2010
+→ CATEGORY: Education | CONFIDENCE: 0.85
+
+Example 2: "SEC filing shows $50M revenue in Q1 2023"
+→ FACT: Reported $50 million revenue in Q1 2023
+→ CATEGORY: Financial | CONFIDENCE: 0.95
+
+Example 3: "Sources suggest possible legal issues"
+→ [SKIP - Vague speculation]
+
+YOUR TASK: Extract verifiable facts about "{target_entity}" from source above.
+
+OUTPUT FORMAT:
+FACT: [Specific statement]
+CATEGORY: [Category name]
+CONFIDENCE: [0.0-1.0]
+
+If no facts: [NO FACTS EXTRACTED]
+"""
         
         facts_text = await self.model_coordinator.generate_with_model(
             task_type="fact_extraction",
             prompt=extraction_prompt,
-            system_message="You are an expert at extracting and verifying factual information from various sources."
+            system_message="You are a forensic analyst with 20+ years experience. You distinguish fact from opinion, assess credibility, and extract precise details. You NEVER speculate - only verifiable facts."
         )
         
         return self._parse_facts(facts_text, result.get('url', 'unknown'))
@@ -545,54 +753,105 @@ class RiskAssessor(BaseNode):
         ])
         
         risk_prompt = f"""
-        Conduct a comprehensive risk assessment for: {target}
-        
-        VERIFIED FACTS:
-        {facts_summary}
-        
-        KEY CONNECTIONS:
-        {connections_summary}
-        
-        DETECTED RED FLAGS:
-        {flags_summary}
-        
-        CRITICAL INSTRUCTIONS:
-        1. Identify DISTINCT, NON-OVERLAPPING risks only
-        2. DO NOT repeat the same risk in multiple categories
-        3. Consolidate related risks into ONE entry with comprehensive evidence
-        4. Provide HIGH SPECIFICITY - avoid generic descriptions
-        
-        RISK CATEGORIES (Choose ONE per risk):
-        
-        1. FINANCIAL RISKS: Undisclosed liabilities, bankruptcy, fraud, complex corporate structures, unusual transactions
-        2. LEGAL_REGULATORY: Litigation, ongoing lawsuits, SEC/regulatory violations, investigations, compliance failures
-        3. REPUTATION: Past scandals, problematic associations, consistent negative media patterns
-        4. OPERATIONAL: Failed ventures, management instability, business practice concerns
-        5. POLITICAL_CONFLICT: Undisclosed political ties, conflicts of interest, foreign government connections
-        
-        OUTPUT FORMAT (JSON-style, one per risk):
-        {{
-          "category": "[FINANCIAL|LEGAL_REGULATORY|REPUTATION|OPERATIONAL|POLITICAL_CONFLICT]",
-          "severity": "[CRITICAL|HIGH|MEDIUM|LOW]",
-          "title": "[Brief specific title, max 60 chars]",
-          "description": "[Detailed description with specifics, no redundancy]",
-          "evidence": "[Specific facts supporting this risk]",
-          "confidence": [0.0-1.0]
-        }}
-        
-        QUALITY CHECKS:
-        - CRITICAL: Only for active legal issues, confirmed fraud, significant regulatory violations
-        - Confidence < 0.5: Don't include unless exceptionally important
-        - Each risk must have DIFFERENT core issue - no variations on same theme
-        - Prioritize specificity over quantity (5-8 DISTINCT risks maximum)
-        
-        Output only the risks in the format above, nothing else.
-        """
+You are conducting a comprehensive risk assessment for: "{target}" (individual OR organization)
+
+===== CONTEXT =====
+VERIFIED FACTS:
+{facts_summary}
+
+KEY CONNECTIONS:
+{connections_summary}
+
+DETECTED RED FLAGS:
+{flags_summary}
+
+===== TASK =====
+Identify DISTINCT, MATERIAL risks that could impact due diligence decisions.
+
+STEP 1 - ANALYZE THE FACTS:
+- What factual evidence suggests potential problems?
+- Are there patterns of concerning behavior?
+- What risks are supported by hard evidence vs. speculation?
+
+STEP 2 - CATEGORIZE RISKS:
+Choose ONE category per risk (do NOT duplicate):
+
+1. FINANCIAL: Fraud, bankruptcy, embezzlement, undisclosed liabilities, suspicious transactions, tax evasion
+2. LEGAL: Active lawsuits, criminal charges, regulatory investigations, SEC violations, settlements, judgments
+3. REPUTATION: Scandals, controversies, ethics violations, consistent negative press, damaged credibility
+4. OPERATIONAL: Failed businesses, management turnover, workplace issues, safety violations, poor performance
+5. POLITICAL: Conflicts of interest, foreign government ties, corruption allegations, undisclosed political activity
+
+STEP 3 - ASSESS SEVERITY:
+- CRITICAL: Confirmed fraud, active criminal charges, major regulatory sanctions, bankruptcy, material misrepresentation
+- HIGH: Ongoing litigation, SEC investigations, significant ethical breaches, pattern of problems
+- MEDIUM: Settled lawsuits, past controversies, moderate compliance issues, questionable associations
+- LOW: Minor issues, old incidents (>5 years), resolved matters with no pattern
+
+===== FEW-SHOT EXAMPLES =====
+
+EXAMPLE 1 - Individual with Legal Risk:
+Facts: "Settled SEC fraud charges for $5M in 2021", "Barred from serving as officer/director for 3 years"
+Reasoning: Recent SEC action with significant penalty. This is an active restriction.
+Output:
+{{
+  "category": "LEGAL",
+  "severity": "CRITICAL",
+  "title": "SEC Fraud Settlement and Officer/Director Bar",
+  "description": "Settled SEC fraud charges with $5 million penalty in 2021 and barred from serving as corporate officer or director for 3 years. This represents confirmed regulatory violation with ongoing restrictions on professional activities.",
+  "evidence": "SEC settlement agreement, 3-year officer/director bar",
+  "confidence": 0.95
+}}
+
+
+EXAMPLE 2 - Individual with Reputation Risk:
+Facts: "Fired from XYZ Corp for ethics violations 2019", "Multiple workplace harassment complaints", "Negative Glassdoor reviews mention hostile behavior"
+Reasoning: Pattern of workplace misconduct across multiple sources.
+Output:
+{{
+  "category": "REPUTATION",
+  "severity": "HIGH",
+  "title": "Termination for Ethics Violations and Harassment",
+  "description": "Terminated from XYZ Corp in 2019 due to ethics violations involving multiple workplace harassment complaints. Pattern confirmed by negative employee reviews citing hostile work environment.",
+  "evidence": "Termination for cause, harassment complaints, employee testimonials",
+  "confidence": 0.85
+}}
+
+===== YOUR TASK =====
+
+Assess risks for: "{target}"
+
+REASONING (Chain of Thought):
+1. What are the most serious concerns based on the facts?
+2. Which risks are supported by concrete evidence?
+3. What severity level is justified by the evidence?
+4. Are there any duplicates or overlaps to consolidate?
+
+OUTPUT FORMAT (5-8 DISTINCT risks maximum):
+{{
+  "category": "[FINANCIAL|LEGAL|REPUTATION|OPERATIONAL|POLITICAL]",
+  "severity": "[CRITICAL|HIGH|MEDIUM|LOW]",
+  "title": "[Specific, concise title, max 60 chars]",
+  "description": "[Detailed description with specifics, dates, amounts, parties]",
+  "evidence": "[List specific supporting facts]",
+  "confidence": [0.0-1.0 based on evidence quality]
+}}
+
+CRITICAL RULES:
+✗ NO duplicate risks (consolidate similar issues)
+✗ NO speculation without evidence
+✗ NO generic descriptions
+✓ ONLY material risks affecting due diligence
+✓ SPECIFIC details (dates, amounts, names)
+✓ DISTINCT core issues
+✓ HIGH confidence threshold (>0.6)
+"""
         
         risk_text = await self.model_coordinator.generate_with_model(
             task_type="risk_assessment",
             prompt=risk_prompt,
-            system_message="You are an expert risk analyst conducting due diligence investigations. Be thorough but only flag risks with solid evidence."
+            system_message="""You are a senior risk analyst and compliance expert with 25+ years at Big 4 firms, specialized in due diligence for private equity, and regulatory matters.
+You are conservative but not paranoid - you flag real risks with solid evidence."""
         )
         
         return self._parse_risks(risk_text)
@@ -759,9 +1018,7 @@ class RiskAssessor(BaseNode):
                 phrase_overlap = len(key_phrases & seen_phrases) / max(len(key_phrases), 1) if key_phrases else 0
                 
                 # Duplicate if:
-                # 1. High word overlap (>50%)
-                # 2. Substring match
-                # 3. Same key phrases (e.g., both about "SEC fraud")
+                
                 if overlap > 0.5 or substring_match or phrase_overlap > 0.7:
                     is_duplicate = True
                     logger.debug(f"Duplicate detected: '{desc[:50]}...' overlaps with '{seen_desc[:50]}...'")
@@ -994,61 +1251,92 @@ class ReportSynthesizer(BaseNode):
         risks_summary = self._format_risks_summary(critical_risks, high_risks, medium_risks, low_risks)
         
         synthesis_prompt = f"""
-        Generate a comprehensive due diligence report for: {target_entity}
-        
-        RESEARCH METADATA:
-        - Research Depth: {research_depth} iterations
-        - Total Verified Facts: {len(verified_facts)}
-        - Average Confidence: {confidence_scores.get('average_confidence', 'N/A')}
-        - Total Connections Mapped: {len(connections)}
-        - Total Risks Identified: {len(risks)}
-        
-        VERIFIED FACTS BY CATEGORY:
-        {facts_summary}
-        
-        KEY CONNECTIONS:
-        {connections_summary}
-        
-        RISK ASSESSMENT:
-        {risks_summary}
-        
-        SYNTHESIS TASK:
-        Create a professional executive summary that includes:
-        
-        1. OVERVIEW
-           - Brief profile of the entity
-           - Key identifying information
-           - Primary areas of activity
-        
-        2. KEY FINDINGS
-           - Most significant discoveries
-           - Notable patterns or trends
-           - Important relationships
-        
-        3. RISK ASSESSMENT SUMMARY
-           - Overall risk level assessment
-           - Critical concerns requiring immediate attention
-           - Areas of uncertainty requiring further investigation
-        
-        4. RECOMMENDATIONS
-           - Suggested actions based on findings
-           - Areas requiring additional due diligence
-           - Monitoring recommendations
-        
-        5. CONFIDENCE & LIMITATIONS
-           - Overall confidence in findings
-           - Information gaps
-           - Source limitations
-        
-        Write in a professional, objective tone suitable for executive review.
-        Be factual and evidence-based. Highlight both positive and negative findings.
-        Clearly distinguish between verified facts and areas of uncertainty.
-        """
+You are creating a COMPREHENSIVE EXECUTIVE SUMMARY for due diligence on: "{target_entity}" (individual OR organization)
+
+===== RESEARCH DATA =====
+METADATA:
+- Research Depth: {research_depth} investigation cycles
+- Verified Facts: {len(verified_facts)}
+- Average Confidence: {confidence_scores.get('average_confidence', 'N/A')}
+- Connections Mapped: {len(connections)}
+- Risks Identified: {len(risks)} ({len(critical_risks)} critical, {len(high_risks)} high)
+
+VERIFIED FACTS:
+{facts_summary}
+
+KEY CONNECTIONS:
+{connections_summary}
+
+RISK ASSESSMENT:
+{risks_summary}
+
+===== TASK =====
+Synthesize all findings into a professional executive summary for C-level decision-makers.
+
+STEP 1 - ANALYZE THE ENTITY:
+- Is this an individual or organization?
+- What is their primary role/activity?
+- What is most important for decision-makers to know?
+
+STEP 2 - STRUCTURE YOUR SUMMARY:
+
+1. ENTITY OVERVIEW (2-3 paragraphs)
+   - Core identity and background
+   - Primary activities/business
+   - Key milestones and timeline
+
+2. MATERIAL FINDINGS (4-6 key points)
+   - Most significant discoveries (positive and negative)
+   - Patterns or trends uncovered
+   - Critical relationships or connections
+   - Notable achievements or controversies
+
+3. RISK PROFILE (2-3 paragraphs)
+   - Overall risk assessment (Critical/High/Medium/Low)
+   - Most serious concerns requiring attention
+   - Potential deal-breakers or red flags
+   - Areas of uncertainty needing further investigation
+
+4. STRATEGIC RECOMMENDATIONS (3-5 actions)
+   - Proceed/Proceed with Caution/Do Not Proceed
+   - Specific mitigation strategies if concerns exist
+   - Additional due diligence areas to explore
+   - Ongoing monitoring recommendations
+
+5. CONFIDENCE & LIMITATIONS (1-2 paragraphs)
+   - Overall confidence level in findings
+   - Information gaps or incomplete areas
+   - Source quality and limitations
+
+===== YOUR TASK =====
+
+Create executive summary for: "{target_entity}"
+
+REASONING (Chain of Thought):
+1. What is the most important information for executives to know?
+2. What are the key risks vs. opportunities?
+3. What is the appropriate risk level (Critical/High/Medium/Low)?
+4. Should we proceed, proceed with caution, or stop?
+5. What additional steps would reduce uncertainty?
+
+OUTPUT: Professional executive summary following the 5-section structure above.
+
+TONE & STYLE:
+✓ Professional, objective, executive-level language
+✓ Balanced (acknowledge both strengths and concerns)
+✓ Specific (use dates, names, amounts, facts)
+✓ Actionable (clear recommendations)
+✓ Honest about limitations and uncertainty
+✗ No speculation beyond the evidence
+✗ No generic platitudes
+✗ No unnecessary jargon
+"""
         
         executive_summary = await self.model_coordinator.generate_with_model(
             task_type="synthesis",
             prompt=synthesis_prompt,
-            system_message="You are a senior analyst synthesizing due diligence findings into an executive report. Be thorough, objective, and professional."
+            system_message="""You are a Managing Director at a top-tier strategy consulting firm (McKinsey, BCG, Bain) with 30+ years synthesizing due diligence for Fortune 500 boards and private equity firms.
+Your reports directly influence major business decisions. You write with clarity, precision, and executive presence."""
         )
         
         # Structure the final report

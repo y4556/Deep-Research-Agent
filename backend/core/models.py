@@ -66,12 +66,12 @@ class MultiModelCoordinator:
         
         # 🎯 BEST MODEL FOR EACH TASK (Mix of Groq + OpenRouter)
         self.task_assignments = {
-            "planning": "or_grok",              # Grok is excellent at planning 🧠
-            "query_generation": "groq_llama_8b", # Fast Groq for quick queries ⚡
-            "fact_extraction": "or_gemma",      # Gemma is good at extraction 📝
-            "risk_assessment": "or_llama_70b",  # Llama 70B for critical analysis 🔍
-            "reflection": "or_mistral",         # Mistral is great at reflection 🤔
-            "synthesis": "or_grok"              # Grok for comprehensive synthesis 📊
+            "planning": "or_grok",              # Grok is excellent at planning 
+            "query_generation": "groq_llama_8b", # Fast Groq for quick queries 
+            "fact_extraction": "or_gemma",      # Gemma is good at extraction 
+            "risk_assessment": "or_llama_70b",  # Llama 70B for critical analysis 
+            "reflection": "or_mistral",         # Mistral is great at reflection 
+            "synthesis": "or_grok"              # Grok for comprehensive synthesis
         }
     
     async def generate_with_model(self, task_type: str, prompt: str, system_message: str = None) -> str:
@@ -98,33 +98,33 @@ class MultiModelCoordinator:
             logger.info(f"✅ Response from {model_name}: {response.content[:200]}...")
             return response.content
         except Exception as e:
-            logger.error(f"❌ Error with {model_name}: {e}")
+            logger.error(f"Error with {model_name}: {e}")
             
             # 🔄 SMART FALLBACK: If OpenRouter fails, try Groq. If Groq fails, try OpenRouter.
             fallback_chain = []
             if model_name.startswith("or_"):
-                # OpenRouter failed, try Groq models
+                
                 fallback_chain = ["groq_llama_70b", "groq_llama_8b", "groq_mixtral"]
             elif model_name.startswith("groq_"):
-                # Groq failed, try OpenRouter models
+                
                 fallback_chain = ["or_grok", "or_llama_70b", "or_mistral"]
             else:
-                # Default fallback
+                
                 fallback_chain = ["or_grok", "groq_llama_70b"]
             
-            # Try each fallback in order
+            
             for fallback_model in fallback_chain:
                 try:
-                    logger.warning(f"🔄 Falling back to {fallback_model}...")
+                    logger.warning(f"Falling back to {fallback_model}...")
                     fallback = self.models[fallback_model]
                     response = await fallback.ainvoke(messages)
-                    logger.info(f"✅ Fallback response from {fallback_model}: {response.content[:200]}...")
+                    logger.info(f"Fallback response from {fallback_model}: {response.content[:200]}...")
                     return response.content
                 except Exception as fallback_error:
-                    logger.error(f"❌ Fallback model {fallback_model} also failed: {fallback_error}")
-                    continue  # Try next fallback
+                    logger.error(f"Fallback model {fallback_model} also failed: {fallback_error}")
+                    continue  
             
-            # If all fallbacks fail, raise error
+        
             raise Exception(f"All models failed including fallbacks. Original error: {e}")
     
     def get_model_stats(self) -> Dict[str, Any]:

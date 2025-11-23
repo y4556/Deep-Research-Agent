@@ -168,56 +168,72 @@ def generate_pdf_report(report_data: dict) -> bytes:
     
     elements.append(PageBreak())
     
-    # === COMPONENT TABLE (User's Requested Format) ===
+    # === REPORT COMPONENTS OVERVIEW (Formatted with Headings & Bullets) ===
     elements.append(Paragraph("REPORT COMPONENTS OVERVIEW", heading_style))
+    elements.append(Spacer(1, 0.15*inch))
+    
+    # Component 1
+    elements.append(Paragraph("<b>1. Biographical & Professional Details</b>", subheading_style))
+    comp1_text = """
+    Verified personal details, career trajectory, and professional history covering:
+    • <b>Education</b> background and academic credentials
+    • <b>Employment</b> history and career progression
+    • <b>Professional</b> certifications and licenses
+    • <b>Family</b> relationships and personal connections
+    • <b>Biographical</b> information and background verification
+    """
+    elements.append(Paragraph(comp1_text, body_style))
     elements.append(Spacer(1, 0.1*inch))
     
-    components_data = [
-        ['Component', 'Description', 'Functional Requirement Addressed'],
-        [
-            'Biographical & Professional Details',
-            'Verified personal details, career trajectory, and professional history.',
-            'Deep Fact Extraction'
-        ],
-        [
-            'Financial/Organizational Connections Map',
-            'A structured map of relationships between the target and other entities, organizations, or individuals (e.g., board seats, investments, shared contacts).',
-            'Connection Mapping'
-        ],
-        [
-            'Identified Red Flags',
-            'Clear enumeration of potential risks, inconsistencies, concerning associations, or behavioral patterns found (e.g., lawsuits, regulatory issues, conflicts of interest).',
-            'Risk Pattern Recognition'
-        ],
-        [
-            'Source Validation & Confidence Scoring',
-            'For every key finding, a reference to the source and an associated confidence score (e.g., "High confidence: 95%" for information cross-referenced across three verified sources).',
-            'Source Validation'
-        ],
-        [
-            'Strategic Insights & Summary',
-            'A final summary of the target\'s overall risk profile (e.g., Low, Medium, High Risk) and strategic insights relevant to due diligence.',
-            'Quality of Risk Assessment Insights'
-        ]
-    ]
+    # Component 2
+    elements.append(Paragraph("<b>2. Financial/Organizational Connections Map</b>", subheading_style))
+    comp2_text = """
+    A structured analysis of relationships between the target and other entities, covering:
+    • <b>Financial</b> relationships (investments, funding, ownership stakes)
+    • <b>Board</b> memberships and advisory positions
+    • <b>Business</b> partnerships and professional associations
+    • <b>Organizational</b> affiliations and institutional connections
+    • <b>Investment</b> activities and portfolio companies
+    """
+    elements.append(Paragraph(comp2_text, body_style))
+    elements.append(Spacer(1, 0.1*inch))
     
-    comp_table = Table(components_data, colWidths=[1.8*inch, 3*inch, 1.7*inch])
-    comp_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f77b4')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 9),
-        ('FONT', (0, 1), (-1, -1), 'Helvetica', 8),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('LEFTPADDING', (0, 0), (-1, -1), 6),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0f0f0')])
-    ]))
+    # Component 3
+    elements.append(Paragraph("<b>3. Identified Red Flags & Risk Factors</b>", subheading_style))
+    comp3_text = """
+    Comprehensive enumeration of potential risks and concerning patterns:
+    • <b>Legal</b> issues (lawsuits, litigation, legal disputes)
+    • <b>Regulatory</b> violations and compliance issues
+    • <b>Financial</b> risks (fraud, bankruptcy, tax issues)
+    • <b>Reputation</b> concerns and public controversies
+    • <b>Conflicts of interest</b> and ethical concerns
+    """
+    elements.append(Paragraph(comp3_text, body_style))
+    elements.append(Spacer(1, 0.1*inch))
     
-    elements.append(comp_table)
+    # Component 4
+    elements.append(Paragraph("<b>4. Source Validation & Confidence Scoring</b>", subheading_style))
+    comp4_text = """
+    Every key finding includes source attribution and confidence assessment:
+    • <b>Source URLs</b> for all information collected
+    • <b>Confidence scores</b> (0-100%) based on source credibility
+    • <b>Cross-reference</b> validation across multiple sources
+    • <b>Verification</b> status for each fact
+    """
+    elements.append(Paragraph(comp4_text, body_style))
+    elements.append(Spacer(1, 0.1*inch))
+    
+    # Component 5
+    elements.append(Paragraph("<b>5. Strategic Insights & Summary</b>", subheading_style))
+    comp5_text = """
+    Final risk assessment and strategic recommendations:
+    • <b>Overall risk level</b> (Critical, High, Medium, Low)
+    • <b>Key findings</b> and material discoveries
+    • <b>Recommendations</b> for decision-making
+    • <b>Areas requiring</b> additional due diligence
+    """
+    elements.append(Paragraph(comp5_text, body_style))
+    
     elements.append(PageBreak())
     
     # === SECTION 1: BIOGRAPHICAL & PROFESSIONAL DETAILS ===
@@ -226,18 +242,65 @@ def generate_pdf_report(report_data: dict) -> bytes:
     
     key_findings = report_data.get('key_findings', [])
     
-    # Filter biographical facts
-    bio_facts = [f for f in key_findings if f.get('category', '').lower() in ['biographical', 'professional', 'personal', 'employment']]
+    # Organize biographical facts by category
+    bio_categories = {
+        'education': [],
+        'employment': [],
+        'professional': [],
+        'family': [],
+        'personal': [],
+        'biographical': []
+    }
     
-    if bio_facts:
-        for fact in bio_facts[:15]:  # Limit to top 15
-            confidence = fact.get('confidence', 0)
-            content = fact.get('content', 'N/A')
-            verified = '✓ Verified' if fact.get('verified', False) else '⚠ Unverified'
+    for fact in key_findings:
+        category = fact.get('category', '').lower()
+        for key in bio_categories.keys():
+            if key in category:
+                bio_categories[key].append(fact)
+                break
+    
+    # Display facts by category with bold category names
+    category_names = {
+        'education': '<b>EDUCATION & ACADEMIC BACKGROUND</b>',
+        'employment': '<b>EMPLOYMENT HISTORY & CAREER</b>',
+        'professional': '<b>PROFESSIONAL CREDENTIALS & EXPERIENCE</b>',
+        'family': '<b>FAMILY & PERSONAL RELATIONSHIPS</b>',
+        'personal': '<b>PERSONAL BACKGROUND</b>',
+        'biographical': '<b>BIOGRAPHICAL INFORMATION</b>'
+    }
+    
+    has_bio_data = False
+    for category_key, category_label in category_names.items():
+        facts = bio_categories[category_key]
+        if facts:
+            has_bio_data = True
+            elements.append(Paragraph(category_label, subheading_style))
+            elements.append(Spacer(1, 0.05*inch))
             
-            fact_text = f"• {content} <i>({verified}, Confidence: {confidence*100:.0f}%)</i>"
-            elements.append(Paragraph(fact_text, body_style))
-    else:
+            for fact in facts[:10]:  # Limit per category
+                confidence = fact.get('confidence', 0)
+                content = fact.get('content', 'N/A')
+                
+                # Make key terms bold in content
+                content = _make_keywords_bold(content)
+                
+                verified = '✓ Verified' if fact.get('verified', False) else '⚠ Unverified'
+                sources = fact.get('sources', [])
+                
+                fact_text = f"• {content}<br/><i>  └ {verified} | Confidence: {confidence*100:.0f}%</i>"
+                elements.append(Paragraph(fact_text, body_style))
+                
+                # Add source URL
+                if sources:
+                    source_url = sources[0] if isinstance(sources, list) else str(sources)
+                    source_text = f'  <i><font color="blue">Source: {source_url[:80]}{"..." if len(source_url) > 80 else ""}</font></i>'
+                    elements.append(Paragraph(source_text, ParagraphStyle('SourceText', parent=body_style, fontSize=8, leftIndent=15, spaceAfter=8)))
+                
+                elements.append(Spacer(1, 0.05*inch))
+            
+            elements.append(Spacer(1, 0.1*inch))
+    
+    if not has_bio_data:
         elements.append(Paragraph("No biographical information available.", body_style))
     
     elements.append(Spacer(1, 0.2*inch))
@@ -247,68 +310,138 @@ def generate_pdf_report(report_data: dict) -> bytes:
     elements.append(Paragraph("2. FINANCIAL/ORGANIZATIONAL CONNECTIONS MAP", heading_style))
     elements.append(Spacer(1, 0.1*inch))
     
+    intro_text = """
+    This section maps all identified relationships between the target entity and other <b>individuals</b>, 
+    <b>organizations</b>, <b>companies</b>, and <b>institutions</b>. Connections are categorized by relationship 
+    type and assessed for strength based on available evidence.
+    """
+    elements.append(Paragraph(intro_text, body_style))
+    elements.append(Spacer(1, 0.15*inch))
+    
     connections = report_data.get('connection_network', [])
     
     if connections:
-        conn_data = [['Source', 'Relationship', 'Target', 'Strength']]
+        # Group connections by relationship type
+        conn_by_type = {}
+        for conn in connections:
+            rel_type = conn.get('relationship', 'other').lower()
+            if rel_type not in conn_by_type:
+                conn_by_type[rel_type] = []
+            conn_by_type[rel_type].append(conn)
         
-        for conn in connections[:20]:  # Limit to top 20
-            conn_data.append([
-                str(conn.get('source', 'N/A'))[:30],
-                str(conn.get('relationship', 'N/A'))[:20],
-                str(conn.get('target', 'N/A'))[:30],
-                f"{conn.get('strength', 0)*100:.0f}%"
-            ])
+        # Relationship type labels with bold formatting
+        type_labels = {
+            'financial': '<b>FINANCIAL CONNECTIONS</b>',
+            'business': '<b>BUSINESS RELATIONSHIPS</b>',
+            'professional': '<b>PROFESSIONAL ASSOCIATIONS</b>',
+            'family': '<b>FAMILY CONNECTIONS</b>',
+            'political': '<b>POLITICAL AFFILIATIONS</b>',
+            'board': '<b>BOARD & ADVISORY ROLES</b>',
+            'investment': '<b>INVESTMENT RELATIONSHIPS</b>',
+            'other': '<b>OTHER CONNECTIONS</b>'
+        }
         
-        conn_table = Table(conn_data, colWidths=[2*inch, 1.5*inch, 2*inch, 1*inch])
-        conn_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2e86ab')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold', 9),
-            ('FONT', (0, 1), (-1, -1), 'Helvetica', 8),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0f0f0')])
-        ]))
-        
-        elements.append(conn_table)
+        for rel_type, label in type_labels.items():
+            if rel_type in conn_by_type:
+                elements.append(Paragraph(label, subheading_style))
+                elements.append(Spacer(1, 0.05*inch))
+                
+                for conn in conn_by_type[rel_type][:15]:  # Limit per type
+                    source = conn.get('source', 'N/A')
+                    target = conn.get('target', 'N/A')
+                    strength = conn.get('strength', 0) * 100
+                    evidence = conn.get('evidence', [])
+                    
+                    # Determine strength indicator
+                    if strength >= 80:
+                        strength_indicator = "🔴 <b>Strong</b>"
+                    elif strength >= 50:
+                        strength_indicator = "🟡 <b>Medium</b>"
+                    else:
+                        strength_indicator = "🟢 <b>Weak</b>"
+                    
+                    conn_text = f"• <b>{target}</b> ({strength_indicator} - {strength:.0f}%)"
+                    elements.append(Paragraph(conn_text, body_style))
+                    
+                    # Add evidence if available
+                    if evidence:
+                        evidence_text = evidence[0] if isinstance(evidence, list) else str(evidence)
+                        evidence_text = _make_keywords_bold(evidence_text)
+                        elements.append(Paragraph(f"  <i>└ {evidence_text[:150]}...</i>", 
+                                                ParagraphStyle('Evidence', parent=body_style, fontSize=8, leftIndent=15, spaceAfter=6)))
+                    
+                    elements.append(Spacer(1, 0.05*inch))
+                
+                elements.append(Spacer(1, 0.1*inch))
     else:
-        elements.append(Paragraph("No connection data available.", body_style))
+        elements.append(Paragraph("No connection data available at this time.", body_style))
     
     elements.append(Spacer(1, 0.2*inch))
     elements.append(PageBreak())
     
-    # === SECTION 3: IDENTIFIED RED FLAGS ===
+    # === SECTION 3: IDENTIFIED RED FLAGS & RISK FACTORS ===
     elements.append(Paragraph("3. IDENTIFIED RED FLAGS & RISK FACTORS", heading_style))
     elements.append(Spacer(1, 0.1*inch))
     
-    # Aggregate all risks
-    all_risks = []
-    all_risks.extend(risk_assessment.get('critical_risks', []))
-    all_risks.extend(risk_assessment.get('high_risks', []))
-    all_risks.extend(risk_assessment.get('medium_risks', []))
-    all_risks.extend(risk_assessment.get('low_risks', []))
+    intro_text = """
+    This section identifies potential <b>risks</b>, <b>inconsistencies</b>, <b>legal issues</b>, 
+    <b>regulatory concerns</b>, and other <b>red flags</b> discovered during the investigation. 
+    Risks are categorized by severity and supported by evidence.
+    """
+    elements.append(Paragraph(intro_text, body_style))
+    elements.append(Spacer(1, 0.15*inch))
     
-    if all_risks:
-        for i, risk in enumerate(all_risks, 1):
-            severity = risk.get('severity', 'unknown').upper()
-            risk_type = risk.get('type', 'Unknown').replace('_', ' ').title()
-            description = risk.get('description', 'No description available')
-            confidence = risk.get('confidence', 0)
-            impact = risk.get('impact', 'Unknown')
+    # Organize risks by severity category
+    risk_categories = {
+        'critical': risk_assessment.get('critical_risks', []),
+        'high': risk_assessment.get('high_risks', []),
+        'medium': risk_assessment.get('medium_risks', []),
+        'low': risk_assessment.get('low_risks', [])
+    }
+    
+    severity_labels = {
+        'critical': ('<b>CRITICAL RISKS</b> 🔴', colors.HexColor('#ff0000')),
+        'high': ('<b>HIGH PRIORITY RISKS</b> 🟠', colors.HexColor('#ff6600')),
+        'medium': ('<b>MEDIUM PRIORITY RISKS</b> 🟡', colors.HexColor('#ffcc00')),
+        'low': ('<b>LOW PRIORITY RISKS</b> 🟢', colors.HexColor('#00cc00'))
+    }
+    
+    has_risks = False
+    for severity, (label, color) in severity_labels.items():
+        risks = risk_categories[severity]
+        if risks:
+            has_risks = True
+            elements.append(Paragraph(label, subheading_style))
+            elements.append(Spacer(1, 0.05*inch))
             
-            risk_text = f"""
-            <b>{i}. [{severity}] {risk_type}</b><br/>
-            {description}<br/>
-            <i>Confidence: {confidence*100:.0f}% | Impact: {impact}</i>
-            """
-            elements.append(Paragraph(risk_text, body_style))
-            elements.append(Spacer(1, 0.1*inch))
-    else:
-        elements.append(Paragraph("No significant risks identified.", body_style))
+            for i, risk in enumerate(risks, 1):
+                risk_type = risk.get('type', 'Unknown').replace('_', ' ').title()
+                description = risk.get('description', 'No description available')
+                description = _make_keywords_bold(description)
+                confidence = risk.get('confidence', 0)
+                impact = risk.get('impact', 'Unknown')
+                evidence = risk.get('evidence', [])
+                
+                risk_text = f"""
+                <b>{i}. {risk_type}</b><br/>
+                {description}<br/>
+                <i>└ Confidence: {confidence*100:.0f}% | Impact: {impact}</i>
+                """
+                elements.append(Paragraph(risk_text, body_style))
+                
+                # Add evidence/source if available
+                if evidence:
+                    evidence_text = evidence[0] if isinstance(evidence, list) else str(evidence)
+                    evidence_text = _make_keywords_bold(evidence_text)
+                    elements.append(Paragraph(f'  <i><font color="gray">Evidence: {evidence_text[:120]}...</font></i>', 
+                                            ParagraphStyle('EvidenceText', parent=body_style, fontSize=8, leftIndent=15, spaceAfter=8)))
+                
+                elements.append(Spacer(1, 0.08*inch))
+            
+            elements.append(Spacer(1, 0.15*inch))
+    
+    if not has_risks:
+        elements.append(Paragraph("✓ No significant risks or red flags identified in the investigation.", body_style))
     
     elements.append(Spacer(1, 0.2*inch))
     elements.append(PageBreak())
@@ -317,36 +450,66 @@ def generate_pdf_report(report_data: dict) -> bytes:
     elements.append(Paragraph("4. SOURCE VALIDATION & CONFIDENCE SCORING", heading_style))
     elements.append(Spacer(1, 0.1*inch))
     
+    intro_text = """
+    All information in this report is attributed to <b>verified sources</b>. Each fact includes 
+    a <b>confidence score</b> based on source <b>credibility</b>, <b>cross-reference validation</b>, 
+    and <b>consistency</b> across multiple sources.
+    """
+    elements.append(Paragraph(intro_text, body_style))
+    elements.append(Spacer(1, 0.15*inch))
+    
     # Confidence distribution
     high_conf = metadata.get('high_confidence_facts', 0)
     total_facts = metadata.get('total_facts_discovered', 0)
     avg_conf = metadata.get('average_confidence', 0)
     
+    elements.append(Paragraph("<b>Overall Confidence Metrics:</b>", subheading_style))
     validation_text = f"""
-    <b>Overall Confidence Metrics:</b><br/>
-    • Average Confidence Score: {avg_conf*100:.1f}%<br/>
-    • High Confidence Facts (>80%): {high_conf} out of {total_facts}<br/>
-    • Total Facts Verified: {metadata.get('total_verified_facts', 0)}<br/>
-    • Total Sources Consulted: {metadata.get('sources_consulted', 0)}<br/>
+    • <b>Average Confidence Score:</b> {avg_conf*100:.1f}%<br/>
+    • <b>High Confidence Facts</b> (>80%): {high_conf} out of {total_facts}<br/>
+    • <b>Total Facts Verified:</b> {metadata.get('total_verified_facts', 0)}<br/>
+    • <b>Total Sources Consulted:</b> {len(_extract_unique_sources(key_findings))}<br/>
     """
     elements.append(Paragraph(validation_text, body_style))
+    elements.append(Spacer(1, 0.15*inch))
+    
+    # List all unique sources/websites
+    elements.append(Paragraph("<b>Sources Consulted (Websites):</b>", subheading_style))
+    elements.append(Spacer(1, 0.05*inch))
+    
+    unique_sources = _extract_unique_sources(key_findings)
+    if unique_sources:
+        for i, source_url in enumerate(unique_sources[:30], 1):  # Limit to 30 sources
+            source_text = f'{i}. <font color="blue">{source_url}</font>'
+            elements.append(Paragraph(source_text, ParagraphStyle('SourceList', parent=body_style, fontSize=8, leftIndent=10, spaceAfter=4)))
+    else:
+        elements.append(Paragraph("No source URLs available.", body_style))
+    
     elements.append(Spacer(1, 0.2*inch))
     
     # Top verified facts with sources
     elements.append(Paragraph("<b>Top Verified Facts with Sources:</b>", subheading_style))
+    elements.append(Spacer(1, 0.05*inch))
     
     verified_facts = [f for f in key_findings if f.get('verified', False)]
-    for fact in verified_facts[:10]:
-        content = fact.get('content', 'N/A')
-        confidence = fact.get('confidence', 0)
-        sources = fact.get('sources', [])
-        
-        fact_text = f"• {content} <i>(Confidence: {confidence*100:.0f}%)</i>"
-        elements.append(Paragraph(fact_text, body_style))
-        
-        if sources:
-            source_text = f"  <i>Source: {sources[0][:100]}...</i>"
-            elements.append(Paragraph(source_text, ParagraphStyle('SourceText', parent=body_style, fontSize=8, leftIndent=20)))
+    if verified_facts:
+        for i, fact in enumerate(verified_facts[:10], 1):
+            content = fact.get('content', 'N/A')
+            content = _make_keywords_bold(content)
+            confidence = fact.get('confidence', 0)
+            sources = fact.get('sources', [])
+            
+            fact_text = f"{i}. {content}<br/><i>  └ Confidence: {confidence*100:.0f}%</i>"
+            elements.append(Paragraph(fact_text, body_style))
+            
+            if sources:
+                source_url = sources[0] if isinstance(sources, list) else str(sources)
+                source_text = f'  <i><font color="blue">Source: {source_url}</font></i>'
+                elements.append(Paragraph(source_text, ParagraphStyle('SourceText', parent=body_style, fontSize=8, leftIndent=15, spaceAfter=8)))
+            
+            elements.append(Spacer(1, 0.05*inch))
+    else:
+        elements.append(Paragraph("No verified facts available.", body_style))
     
     elements.append(PageBreak())
     
@@ -354,22 +517,39 @@ def generate_pdf_report(report_data: dict) -> bytes:
     elements.append(Paragraph("5. STRATEGIC INSIGHTS & SUMMARY", heading_style))
     elements.append(Spacer(1, 0.1*inch))
     
-    # Risk profile summary
-    risk_summary = f"""
-    <b>Risk Profile Summary:</b><br/>
-    The target has been assessed with an <b>{overall_risk}</b> overall risk level based on comprehensive analysis.<br/><br/>
-    
-    <b>Key Risk Indicators:</b><br/>
-    • Critical Risks Identified: {len(risk_assessment.get('critical_risks', []))}<br/>
-    • High Priority Risks: {len(risk_assessment.get('high_risks', []))}<br/>
-    • Medium Priority Risks: {len(risk_assessment.get('medium_risks', []))}<br/>
-    • Low Priority Risks: {len(risk_assessment.get('low_risks', []))}<br/><br/>
-    
-    <b>Recommendation:</b><br/>
-    {_get_risk_recommendation(overall_risk)}
+    intro_text = """
+    This final section provides a comprehensive <b>risk profile</b> of the target entity and 
+    <b>strategic recommendations</b> based on all findings from the investigation.
     """
+    elements.append(Paragraph(intro_text, body_style))
+    elements.append(Spacer(1, 0.15*inch))
     
-    elements.append(Paragraph(risk_summary, body_style))
+    # Risk profile summary
+    elements.append(Paragraph("<b>RISK PROFILE SUMMARY</b>", subheading_style))
+    risk_summary_text = f"""
+    The target entity has been assessed with an <b>{overall_risk}</b> overall <b>risk level</b> 
+    based on comprehensive analysis of <b>biographical</b> data, <b>financial</b> connections, 
+    <b>legal</b> history, and <b>reputation</b> factors.
+    """
+    elements.append(Paragraph(risk_summary_text, body_style))
+    elements.append(Spacer(1, 0.1*inch))
+    
+    elements.append(Paragraph("<b>KEY RISK INDICATORS</b>", subheading_style))
+    risk_indicators = f"""
+    • <b>Critical Risks</b> Identified: {len(risk_assessment.get('critical_risks', []))}<br/>
+    • <b>High Priority Risks:</b> {len(risk_assessment.get('high_risks', []))}<br/>
+    • <b>Medium Priority Risks:</b> {len(risk_assessment.get('medium_risks', []))}<br/>
+    • <b>Low Priority Risks:</b> {len(risk_assessment.get('low_risks', []))}<br/>
+    • <b>Total Connections</b> Mapped: {len(report_data.get('connection_network', []))}<br/>
+    • <b>Average Confidence</b> Score: {avg_conf*100:.1f}%
+    """
+    elements.append(Paragraph(risk_indicators, body_style))
+    elements.append(Spacer(1, 0.15*inch))
+    
+    elements.append(Paragraph("<b>RECOMMENDATION</b>", subheading_style))
+    recommendation = _get_risk_recommendation(overall_risk)
+    recommendation = _make_keywords_bold(recommendation)
+    elements.append(Paragraph(recommendation, body_style))
     elements.append(Spacer(1, 0.3*inch))
     
     # === FOOTER ===
@@ -389,6 +569,73 @@ def generate_pdf_report(report_data: dict) -> bytes:
     buffer.close()
     
     return pdf_bytes
+
+
+def _make_keywords_bold(text: str) -> str:
+    """
+    Make important keywords bold in text for better readability
+    """
+    keywords = [
+        # Professional & Career
+        'employment', 'employed', 'career', 'job', 'position', 'role', 'work', 'worked',
+        'education', 'degree', 'university', 'college', 'graduated', 'studied',
+        'professional', 'certification', 'certified', 'license', 'licensed',
+        'CEO', 'CFO', 'CTO', 'founder', 'co-founder', 'director', 'manager', 'executive',
+        
+        # Financial
+        'financial', 'finance', 'investment', 'invested', 'investor', 'funding', 'funded',
+        'revenue', 'profit', 'loss', 'income', 'assets', 'capital', 'equity', 'stock',
+        'board', 'board member', 'shareholder', 'ownership', 'owns', 'acquired',
+        'bankruptcy', 'bankrupt', 'insolvent', 'debt', 'creditor',
+        
+        # Legal & Risk
+        'lawsuit', 'sued', 'litigation', 'legal', 'court', 'trial', 'settlement',
+        'fraud', 'fraudulent', 'criminal', 'investigation', 'investigated', 'SEC',
+        'regulatory', 'regulation', 'compliance', 'violation', 'violated', 'penalty',
+        'sanctions', 'sanctioned', 'indictment', 'indicted', 'convicted', 'guilty',
+        'misconduct', 'allegation', 'alleged', 'accused',
+        
+        # Relationships
+        'family', 'spouse', 'married', 'partner', 'relative', 'sibling', 'parent',
+        'business', 'company', 'organization', 'firm', 'corporation', 'enterprise',
+        'political', 'politics', 'politician', 'government', 'campaign', 'donation',
+        'association', 'affiliated', 'connected', 'relationship', 'partnership',
+        
+        # Reputation & Risk Indicators
+        'scandal', 'controversy', 'controversial', 'conflict of interest',
+        'suspicious', 'questionable', 'concerns', 'risk', 'red flag',
+        'resignation', 'resigned', 'terminated', 'fired', 'dismissed'
+    ]
+    
+    # Sort by length (longest first) to avoid partial replacements
+    keywords.sort(key=len, reverse=True)
+    
+    result = text
+    for keyword in keywords:
+        # Case-insensitive replacement with word boundaries
+        import re
+        pattern = re.compile(r'\b' + re.escape(keyword) + r'\b', re.IGNORECASE)
+        result = pattern.sub(lambda m: f'<b>{m.group(0)}</b>', result)
+    
+    return result
+
+
+def _extract_unique_sources(facts: list) -> list:
+    """
+    Extract unique source URLs from all facts
+    """
+    unique_urls = set()
+    
+    for fact in facts:
+        sources = fact.get('sources', [])
+        if isinstance(sources, list):
+            for source in sources:
+                if isinstance(source, str) and (source.startswith('http://') or source.startswith('https://')):
+                    unique_urls.add(source)
+        elif isinstance(sources, str) and (sources.startswith('http://') or sources.startswith('https://')):
+            unique_urls.add(sources)
+    
+    return sorted(list(unique_urls))
 
 
 def _get_risk_recommendation(risk_level: str) -> str:

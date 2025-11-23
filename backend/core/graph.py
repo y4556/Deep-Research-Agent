@@ -83,12 +83,10 @@ class ResearchWorkflow:
         if depth >= max_depth:
             return "finalize"
         
-        # Check if we're still finding new information
         recent_facts = state.get("extracted_facts", [])[-5:]
         if not recent_facts or len(recent_facts) < 2:
             return "finalize"
         
-        # Check knowledge gaps for deep diving
         gaps = state.get("knowledge_gaps", [])
         high_priority_gaps = [gap for gap in gaps if "high" in gap.lower() or "critical" in gap.lower()]
         
@@ -147,7 +145,6 @@ class ResearchWorkflow:
             return final_state
             
         except Exception as e:
-            # Log error to LangSmith
             await self.langsmith_client.error_research_session(
                 research_session_id,
                 str(e)

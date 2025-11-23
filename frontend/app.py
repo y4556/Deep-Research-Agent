@@ -201,17 +201,28 @@ def main():
                 
                 # Fetch REAL backend logs
                 try:
-                    logs_response = api_client.get_session_logs(st.session_state.current_session_id, last_n=50)
+                    logs_response = api_client.get_session_logs(st.session_state.current_session_id, last_n=100)
                     
                     if logs_response and logs_response.get('logs'):
                         backend_logs = logs_response['logs']
                         
-                        # Display logs
-                        log_html = '<div class="log-container">'
+                        # Filter logs - only show node executions and LLM results
+                        filtered_logs = []
+                        keywords = ['Executing', 'LLM Response:', 'Calling LLM', 'Search Results:', 'Query:', 'Starting node']
+                        
                         for log in backend_logs:
-                            log_html += f'<div class="log-line">{log}</div>'
-                        log_html += '</div>'
-                        st.markdown(log_html, unsafe_allow_html=True)
+                            if any(keyword in log for keyword in keywords):
+                                filtered_logs.append(log)
+                        
+                        # Display filtered logs
+                        if filtered_logs:
+                            log_html = '<div class="log-container">'
+                            for log in filtered_logs:
+                                log_html += f'<div class="log-line">{log}</div>'
+                            log_html += '</div>'
+                            st.markdown(log_html, unsafe_allow_html=True)
+                        else:
+                            st.info("No execution logs yet...")
                     else:
                         # Fallback to simple messages if logs not available
                         current_step = status.get('current_step', '')
