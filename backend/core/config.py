@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     SERPER_API_KEY: str = ""
     
+    # Google Custom Search (Fallback for Tavily)
+    GOOGLE_CUSTOM_SEARCH_API_KEY: str = ""  # Get from https://console.cloud.google.com
+    GOOGLE_CSE_ID: str = "46f410e1fc8c44c23"  # Deep Research Agent Custom Search Engine ID
+    
     # LangSmith (Optional - for monitoring)
     LANGSMITH_API_KEY: str = ""
     LANGSMITH_PROJECT: str = "deep-research-agent"

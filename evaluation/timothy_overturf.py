@@ -174,5 +174,5 @@ def calculate_connection_score(connections: List[Dict]) -> float:
     """Calculate connection mapping completeness"""
     if not connections:
         return 0.0
-    ``
+    
     return min(len(connections) / 10, 1.0) 

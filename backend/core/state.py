@@ -60,6 +60,7 @@ class ResearchReport(BaseModel):
     session_id: str
     target_entity: str
     executive_summary: str
+    entity_narrative: Optional[str] = ""  # NEW: Complete chronological story of the entity
     key_findings: List[Fact]
     risk_assessment: Dict[str, Any]  # Changed from List[RiskFlag] to Dict to support frontend structure
     connection_network: List[Connection]

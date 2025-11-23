@@ -41,14 +41,6 @@ class EvaluationRunner:
             {
                 "profile": TIMOTHY_OVERFURT_EVALUATION_PROFILE,
                 "evaluator": evaluate_timothy_overturf_research
-            },
-            {
-                "profile": MARIA_RODRIGUEZ_EVALUATION_PROFILE,
-                "evaluator": evaluate_maria_rodriguez_research
-            },
-            {
-                "profile": BLACKSTONE_CAPITAL_EVALUATION_PROFILE,
-                "evaluator": evaluate_blackstone_capital_research
             }
         ]
     

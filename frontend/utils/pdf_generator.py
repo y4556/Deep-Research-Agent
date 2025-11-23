@@ -168,6 +168,30 @@ def generate_pdf_report(report_data: dict) -> bytes:
     
     elements.append(PageBreak())
     
+    # === ENTITY NARRATIVE / COMPLETE STORY ===
+    entity_narrative = report_data.get('entity_narrative', '')
+    if entity_narrative:
+        elements.append(Paragraph("THE COMPLETE STORY", heading_style))
+        elements.append(Spacer(1, 0.1*inch))
+        
+        narrative_intro = f"""
+        <b>Who is {report_data.get('target_entity', 'this entity')}? What's the full story?</b><br/>
+        This section provides a comprehensive narrative that ties together all the key facts, events, and timeline into a cohesive story.
+        """
+        elements.append(Paragraph(narrative_intro, body_style))
+        elements.append(Spacer(1, 0.15*inch))
+        
+        # Split narrative into paragraphs
+        paragraphs = entity_narrative.split('\n\n')
+        for para in paragraphs:
+            if para.strip():
+                # Apply bold keywords to narrative
+                para_text = _make_keywords_bold(para.strip())
+                elements.append(Paragraph(para_text, body_style))
+                elements.append(Spacer(1, 0.1*inch))
+        
+        elements.append(PageBreak())
+    
     # === REPORT COMPONENTS OVERVIEW (Formatted with Headings & Bullets) ===
     elements.append(Paragraph("REPORT COMPONENTS OVERVIEW", heading_style))
     elements.append(Spacer(1, 0.15*inch))
@@ -366,8 +390,11 @@ def generate_pdf_report(report_data: dict) -> bytes:
                     # Add evidence if available
                     if evidence:
                         evidence_text = evidence[0] if isinstance(evidence, list) else str(evidence)
-                        evidence_text = _make_keywords_bold(evidence_text)
-                        elements.append(Paragraph(f"  <i>└ {evidence_text[:150]}...</i>", 
+                        # Escape HTML to avoid nested tag conflicts
+                        evidence_text = evidence_text.replace('<', '&lt;').replace('>', '&gt;')
+                        # Show more evidence text (up to 300 chars instead of 150)
+                        truncated_evidence = evidence_text[:300] + ("..." if len(evidence_text) > 300 else "")
+                        elements.append(Paragraph(f"  <i>└ {truncated_evidence}</i>", 
                                                 ParagraphStyle('Evidence', parent=body_style, fontSize=8, leftIndent=15, spaceAfter=6)))
                     
                     elements.append(Spacer(1, 0.05*inch))
@@ -432,8 +459,11 @@ def generate_pdf_report(report_data: dict) -> bytes:
                 # Add evidence/source if available
                 if evidence:
                     evidence_text = evidence[0] if isinstance(evidence, list) else str(evidence)
-                    evidence_text = _make_keywords_bold(evidence_text)
-                    elements.append(Paragraph(f'  <i><font color="gray">Evidence: {evidence_text[:120]}...</font></i>', 
+                    # Don't apply bold to evidence text to avoid nested HTML tag conflicts
+                    evidence_text = evidence_text.replace('<', '&lt;').replace('>', '&gt;')  # Escape any HTML
+                    # Show more evidence text (up to 250 chars instead of 120)
+                    truncated_evidence = evidence_text[:250] + ("..." if len(evidence_text) > 250 else "")
+                    elements.append(Paragraph(f'  <i><font color="gray">Evidence: {truncated_evidence}</font></i>', 
                                             ParagraphStyle('EvidenceText', parent=body_style, fontSize=8, leftIndent=15, spaceAfter=8)))
                 
                 elements.append(Spacer(1, 0.08*inch))

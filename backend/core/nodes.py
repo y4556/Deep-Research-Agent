@@ -428,62 +428,157 @@ class FactExtractor(BaseNode):
         logger.info("~"*80)
         
         recent_results = state["raw_search_results"][-10:]  # Process recent results
+        existing_facts = state.get("extracted_facts", [])
         
         extracted_facts = []
         for result in recent_results:
             facts = await self._extract_facts_from_result(result, state["target_entity"])
             extracted_facts.extend(facts)
         
-        logger.info(f"✅ Fact Extractor completed - Extracted {len(extracted_facts)} new facts")
+        # Deduplicate facts to avoid repetition
+        deduplicated_facts = self._deduplicate_facts(extracted_facts, existing_facts)
+        
+        logger.info(f"✅ Fact Extractor completed - Extracted {len(extracted_facts)} facts, {len(deduplicated_facts)} unique")
         
         return {
             **state,
-            "extracted_facts": state.get("extracted_facts", []) + extracted_facts
+            "extracted_facts": existing_facts + deduplicated_facts
         }
+    
+    def _deduplicate_facts(self, new_facts: List[Dict], existing_facts: List[Dict]) -> List[Dict]:
+        """Remove duplicate facts based on content similarity"""
+        unique_facts = []
+        all_existing_content = [f.get('content', '').lower() for f in existing_facts]
+        
+        for fact in new_facts:
+            fact_content = fact.get('content', '').lower()
+            
+            # Check if fact is substantially similar to existing facts
+            is_duplicate = False
+            for existing_content in all_existing_content:
+                # Calculate word overlap
+                fact_words = set(fact_content.split())
+                existing_words = set(existing_content.split())
+                
+                if len(fact_words) == 0:
+                    continue
+                    
+                overlap = len(fact_words & existing_words) / len(fact_words)
+                
+                # If >70% word overlap or exact substring match, it's a duplicate
+                if overlap > 0.7 or fact_content in existing_content or existing_content in fact_content:
+                    is_duplicate = True
+                    logger.debug(f"Skipping duplicate fact: {fact_content[:80]}...")
+                    break
+            
+            if not is_duplicate:
+                unique_facts.append(fact)
+                all_existing_content.append(fact_content)
+        
+        return unique_facts
     
     async def _extract_facts_from_result(self, result: Dict, target_entity: str) -> List[Dict]:
         """Extract facts from a single search result"""
         extraction_prompt = f"""
-You are extracting verifiable facts about "{target_entity}" (individual OR organization) from a search result.
+You are extracting DETAILED, COMPLETE, verifiable facts about "{target_entity}" from a search result.
 
 ===== SOURCE DOCUMENT =====
 TITLE: {result.get('title', 'N/A')}
 CONTENT: {result.get('content', 'N/A')}
 URL: {result.get('url', 'N/A')}
 
-TASK: Extract ONLY factual, verifiable information. NO inference or speculation.
+CRITICAL RULES:
+1. Extract COMPLETE facts - include ALL relevant details (dates, places, amounts, names)
+2. DO NOT cut facts short - include full sentences with context
+3. Be SPECIFIC - "Elizabeth Holmes founded Theranos in 2003 at age 19 in Palo Alto, California" NOT "Founded a company"
+4. NO DUPLICATES - if a fact is similar to something already stated, skip it
+5. NO SPECULATION - only extract what is explicitly stated
 
-CATEGORIES (select appropriate):
-For INDIVIDUALS: Biographical, Education, Employment, Financial, Legal, Relationships, Reputation
-For ORGANIZATIONS: Corporate, Leadership, Financial, Operations, Legal, Ownership, Reputation
+CATEGORIES (choose ONE per fact):
+For INDIVIDUALS: 
+- Biographical (birth, age, nationality, upbringing, background)
+- Education (degrees, universities, years, majors, academic achievements)
+- Employment (job titles, companies, dates employed, responsibilities, achievements)
+- Financial (wealth, salary, investments, assets, fundraising)
+- Legal (lawsuits, charges, investigations, settlements, convictions)
+- Family (spouse, children, relatives, personal relationships)
+- Professional (licenses, certifications, board memberships, professional associations)
+
+For ORGANIZATIONS:
+- Corporate (founding, headquarters, legal structure, registration)
+- Leadership (CEO, executives, board members, founders)
+- Financial (revenue, profit, funding, valuation, financial status)
+- Operations (products, services, customers, employees, market position)
+- Legal (lawsuits, regulatory actions, compliance, investigations)
+- Ownership (shareholders, parent companies, subsidiaries, investors)
 
 CONFIDENCE LEVELS:
-0.9-1.0: Official records (SEC, court, government)
-0.7-0.9: Reputable news with quotes/documentation
-0.5-0.7: Industry publications, verified profiles
-0.3-0.5: Unverified claims
+0.9-1.0: Official government records, court documents, SEC filings
+0.7-0.9: Reputable news (WSJ, NYT, Reuters) with direct quotes and documentation
+0.5-0.7: Industry publications, verified LinkedIn/official company profiles
+0.3-0.5: Unverified claims, blogs, social media
+
+===== EXAMPLES OF GOOD VS BAD FACTS =====
+
+❌ BAD (too vague): "Graduated from college"
+✅ GOOD (detailed): "Graduated from Stanford University with a B.A. in Chemical Engineering in 2003"
+
+❌ BAD (incomplete): "Founded a company"
+✅ GOOD (complete): "Founded Theranos in Palo Alto, California in 2003 at age 19 after dropping out of Stanford University"
+
+❌ BAD (cut off): "Worked as CEO from..."
+✅ GOOD (full detail): "Served as CEO of Theranos from 2003 to 2018, overseeing the company's growth to a $9 billion valuation at its peak in 2015"
+
+❌ BAD (generic): "Had legal issues"
+✅ GOOD (specific): "Charged by the SEC with massive fraud in March 2018, agreed to pay $500,000 penalty and relinquish voting control of Theranos, and was barred from serving as an officer or director of a public company for 10 years"
+
+❌ BAD (vague): "Was convicted"
+✅ GOOD (detailed): "Found guilty on January 3, 2022, of four counts of fraud against investors after a federal jury trial that lasted from September 2021 to January 2022"
 
 FEW-SHOT EXAMPLES:
 
-Example 1: "Graduated from MIT with B.S. in Computer Science in 2010"
-→ FACT: Graduated from MIT with B.S. in Computer Science in 2010
-→ CATEGORY: Education | CONFIDENCE: 0.85
+Example 1 (Education):
+Source: "Holmes enrolled at Stanford University in 2002 to study chemical engineering but dropped out in her sophomore year to found Theranos"
+→ FACT: Enrolled at Stanford University in 2002 to study chemical engineering, dropped out during sophomore year to found Theranos
+→ CATEGORY: Education 
+→ CONFIDENCE: 0.8
 
-Example 2: "SEC filing shows $50M revenue in Q1 2023"
-→ FACT: Reported $50 million revenue in Q1 2023
-→ CATEGORY: Financial | CONFIDENCE: 0.95
+Example 2 (Employment):
+Source: "She served as CEO and chairman of Theranos from its founding in 2003 until she was forced to step down as CEO in 2018 following revelations of fraud"
+→ FACT: Served as CEO and Chairman of Theranos from 2003 to 2018, when she stepped down following fraud revelations
+→ CATEGORY: Employment
+→ CONFIDENCE: 0.9
 
-Example 3: "Sources suggest possible legal issues"
-→ [SKIP - Vague speculation]
+Example 3 (Legal):
+Source: "In 2022, Holmes was found guilty on four counts of defrauding investors and sentenced to 11 years and 3 months in federal prison"
+→ FACT: Found guilty on four counts of defrauding investors in 2022, sentenced to 11 years and 3 months in federal prison
+→ CATEGORY: Legal
+→ CONFIDENCE: 0.95
 
-YOUR TASK: Extract verifiable facts about "{target_entity}" from source above.
+Example 4 (Skip - too vague):
+Source: "Some say she may have had connections to various tech executives"
+→ [SKIP - Vague speculation without specific details]
+
+===== YOUR TASK =====
+
+Extract ALL detailed, complete, verifiable facts about "{target_entity}" from the source document above.
+
+For EACH fact, provide:
+- COMPLETE information with specific details (dates, numbers, names, places)
+- Proper CATEGORY classification
+- Accurate CONFIDENCE score
+- Full context (not cut off mid-sentence)
 
 OUTPUT FORMAT:
-FACT: [Specific statement]
-CATEGORY: [Category name]
-CONFIDENCE: [0.0-1.0]
+FACT: [Complete, detailed statement with all specifics]
+CATEGORY: [One category from the list above]
+CONFIDENCE: [0.0-1.0 based on source quality]
 
-If no facts: [NO FACTS EXTRACTED]
+(Repeat for each fact found)
+
+If NO verifiable facts found: [NO FACTS EXTRACTED]
+
+Remember: DETAIL is key! Include dates, amounts, specific names, and full context!
 """
         
         facts_text = await self.model_coordinator.generate_with_model(
@@ -525,16 +620,24 @@ If no facts: [NO FACTS EXTRACTED]
                     if confidence > 1:  # Percentage
                         confidence /= 100
                 
-                # Determine category
+                # Determine category with better classification
                 category = "general"
-                if any(kw in clean_line.lower() for kw in ['financial', 'money', 'investment', 'company', 'business']):
-                    category = "financial"
-                elif any(kw in clean_line.lower() for kw in ['lawsuit', 'court', 'legal', 'violation', 'investigation']):
+                clean_lower = clean_line.lower()
+                
+                if any(kw in clean_lower for kw in ['born', 'birth', 'age', 'nationality', 'raised', 'grew up', 'childhood']):
+                    category = "biographical"
+                elif any(kw in clean_lower for kw in ['university', 'college', 'degree', 'phd', 'mba', 'graduated', 'studied', 'education', 'school']):
+                    category = "education"
+                elif any(kw in clean_lower for kw in ['ceo', 'cfo', 'cto', 'founder', 'co-founder', 'position', 'worked at', 'employment', 'job', 'career', 'worked for']):
+                    category = "employment"
+                elif any(kw in clean_lower for kw in ['lawsuit', 'court', 'legal', 'violation', 'investigation', 'charged', 'convicted', 'settled', 'sec', 'fraud', 'criminal']):
                     category = "legal"
-                elif any(kw in clean_line.lower() for kw in ['ceo', 'position', 'work', 'employment', 'job']):
+                elif any(kw in clean_lower for kw in ['revenue', 'profit', 'funding', 'investment', 'raised', 'valuation', 'bankruptcy', 'financial', 'money', 'million', 'billion']):
+                    category = "financial"
+                elif any(kw in clean_lower for kw in ['married', 'spouse', 'family', 'relative', 'children', 'partner', 'husband', 'wife']):
+                    category = "family"
+                elif any(kw in clean_lower for kw in ['board', 'director', 'executive', 'management', 'professional', 'license', 'certification']):
                     category = "professional"
-                elif any(kw in clean_line.lower() for kw in ['born', 'education', 'family', 'personal']):
-                    category = "personal"
                 
                 current_fact = {
                     "id": f"fact_{fact_id_counter}_{uuid.uuid4().hex[:8]}",
@@ -555,7 +658,25 @@ If no facts: [NO FACTS EXTRACTED]
         if current_fact:
             facts.append(current_fact)
         
-        return facts[:15]  # Limit to 15 facts per extraction
+        # Filter for quality and completeness
+        quality_facts = []
+        for fact in facts:
+            content = fact['content'].strip()
+            
+            # Quality checks
+            if (len(content) < 20 or  # Too short
+                len(content.split()) < 5 or  # Too few words
+                content.lower().startswith(('no', 'none', 'n/a', '[skip', 'skip')) or  # Negative responses
+                not content[0].isupper() or  # Doesn't start with capital
+                content.count('.') > 5):  # Too many sentences (might be multiple facts)
+                logger.debug(f"Skipping low-quality fact: {content[:50]}...")
+                continue
+            
+            quality_facts.append(fact)
+        
+        logger.info(f"Quality filter: {len(quality_facts)}/{len(facts)} facts passed")
+        
+        return quality_facts[:15]  # Limit to 15 facts per extraction
 
 
 class SourceValidator(BaseNode):
@@ -1339,9 +1460,15 @@ TONE & STYLE:
 Your reports directly influence major business decisions. You write with clarity, precision, and executive presence."""
         )
         
+        # Generate narrative story/overview
+        narrative_story = await self._generate_entity_narrative(
+            target_entity, facts_by_category, connections, risks
+        )
+        
         # Structure the final report
         final_report = {
             "executive_summary": executive_summary,
+            "entity_narrative": narrative_story,  # New: Complete chronological story
             "target_entity": target_entity,
             "session_id": state.get("research_session_id"),
             "research_metadata": {
@@ -1452,6 +1579,110 @@ Your reports directly influence major business decisions. You write with clarity
             return "No significant risks identified."
         
         return "\n".join(summary)
+    
+    async def _generate_entity_narrative(self, target_entity: str, facts_by_category: Dict,
+                                         connections: List[Dict], risks: List[Dict]) -> str:
+        """Generate a chronological narrative story of the entity"""
+        
+        # Organize all facts chronologically
+        all_facts = []
+        for category, facts in facts_by_category.items():
+            for fact in facts:
+                all_facts.append({
+                    'content': fact.get('content', ''),
+                    'category': category,
+                    'confidence': fact.get('confidence', 0)
+                })
+        
+        # Format top facts
+        facts_summary = "\n".join([
+            f"- {fact['content']} [{fact['category']}]"
+            for fact in sorted(all_facts, key=lambda x: x['confidence'], reverse=True)[:30]
+        ])
+        
+        # Format key connections
+        connections_summary = "\n".join([
+            f"- Connected to {conn.get('target', 'Unknown')} ({conn.get('relationship', 'unknown')})"
+            for conn in connections[:15]
+        ])
+        
+        # Format critical events/risks
+        critical_events = "\n".join([
+            f"- {risk.get('description', '')}"
+            for risk in risks if risk.get('severity') in ['critical', 'high']
+        ][:10])
+        
+        narrative_prompt = f"""
+You are writing a comprehensive narrative story about "{target_entity}" based on verified research findings.
+
+===== YOUR TASK =====
+Write a 3-5 paragraph chronological narrative that tells the COMPLETE STORY of this entity from beginning to present.
+
+This is NOT a bullet-point list. This is a NARRATIVE STORY written in paragraph form.
+
+For INDIVIDUALS: Tell their life story
+- Early life, birth, family background (if known)
+- Education and formative years
+- Career trajectory and major achievements
+- Key business ventures, companies founded/led
+- Major events, scandals, legal issues (if any)
+- Current status and legacy
+
+For ORGANIZATIONS: Tell the company's story
+- Founding story (who, when, where, why)
+- Early years and initial products/services
+- Growth trajectory, funding rounds, expansions
+- Key milestones and achievements
+- Major controversies, problems, or failures (if any)
+- Current status and market position
+
+===== VERIFIED FACTS =====
+{facts_summary}
+
+===== KEY CONNECTIONS =====
+{connections_summary}
+
+===== CRITICAL EVENTS =====
+{critical_events}
+
+===== EXAMPLE FORMAT (Elizabeth Holmes / Theranos) =====
+
+Elizabeth Holmes was born in Washington, D.C. in 1984 to a family with a history of public service. She enrolled at Stanford University in 2002 to study chemical engineering, demonstrating early promise and ambition. However, in 2003 at age 19, she made the bold decision to drop out of Stanford during her sophomore year to pursue her vision of revolutionizing blood testing.
+
+In 2003, Holmes founded Theranos in Palo Alto, California, with the ambitious goal of making blood diagnostics faster, cheaper, and more accessible using just a finger prick instead of traditional venipuncture. She served as CEO and Chairman, raising substantial venture capital funding. By 2015, Theranos reached a staggering $9 billion valuation, and Holmes was celebrated as the youngest self-made female billionaire, gracing magazine covers and earning comparisons to Steve Jobs. The company claimed its proprietary Edison device could run hundreds of tests from a single drop of blood, partnering with major pharmacy chains like Walgreens.
+
+However, the foundation began to crumble in 2015 when investigative journalist John Carreyrou of The Wall Street Journal published exposés revealing that Theranos's technology did not work as advertised. The company was secretly using traditional blood testing equipment for most tests, and its own devices produced unreliable results that could endanger patients. This triggered regulatory investigations and the eventual unraveling of what prosecutors would call a massive fraud scheme.
+
+In March 2018, the SEC charged Holmes with massive fraud, alleging she had misled investors about the company's technology, business relationships, and financial performance. She agreed to pay a $500,000 penalty, relinquish voting control of Theranos, and was barred from serving as an officer or director of any public company for 10 years. Theranos officially dissolved in September 2018. In June 2018, federal prosecutors brought criminal charges against Holmes for wire fraud and conspiracy to commit wire fraud.
+
+Her criminal trial began in September 2021 and lasted until January 2022. On January 3, 2022, a federal jury found her guilty on four counts of defrauding investors out of hundreds of millions of dollars. She was acquitted on charges related to defrauding patients. In November 2022, Holmes was sentenced to 11 years and 3 months in federal prison and ordered to pay $452 million in restitution to victims. She began serving her sentence in May 2023 at a minimum-security federal prison in Bryan, Texas. The Theranos scandal has become one of the most notorious cases of Silicon Valley fraud, serving as a cautionary tale about the dangers of hype, deception, and prioritizing growth over ethics in the startup world.
+
+===== YOUR NARRATIVE FOR "{target_entity}" =====
+
+Write 3-5 comprehensive paragraphs telling the complete story chronologically. Include:
+- Origins/founding/early life with specific dates
+- Key milestones and achievements with timeline
+- Major turning points and critical events
+- Controversies, legal issues, or scandals (if any) with details
+- Current status and overall significance
+
+Write in NARRATIVE form (paragraphs), NOT bullet points.
+Focus on CHRONOLOGY - tell the story from beginning to end.
+Include SPECIFIC DETAILS: dates, amounts, names, places from the verified facts.
+Make it COMPREHENSIVE yet CONCISE - capture the full arc of the story.
+
+Begin now:
+"""
+        
+        narrative_story = await self.model_coordinator.generate_with_model(
+            task_type="synthesis",
+            prompt=narrative_prompt,
+            system_message="""You are an investigative journalist and biographer who has written bestselling books about major business figures and scandals.
+You excel at narrative storytelling, weaving facts into compelling chronological narratives. You write with clarity, drama, and precision.
+Your narratives are factual, well-sourced, and capture both successes and failures. You tell the COMPLETE story."""
+        )
+        
+        return narrative_story
     
     def _calculate_overall_risk_level(self, risks: List[Dict]) -> str:
         """Calculate overall risk level"""
