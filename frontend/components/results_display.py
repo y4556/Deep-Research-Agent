@@ -112,6 +112,12 @@ def display_complete_report(report: dict):
     
     st.markdown("---")
     
+    # Biographical Summary (Entity Narrative)
+    if report.get("entity_narrative"):
+        st.subheader("📖 Complete Biography / Entity Story")
+        st.markdown(report["entity_narrative"])
+        st.markdown("---")
+    
     # Create tabs for different sections
     tab1, tab2, tab3, tab4 = st.tabs([
         "🔍 Key Findings",
@@ -156,19 +162,23 @@ def display_complete_report(report: dict):
 
 def display_key_findings(report: dict):
     """Display key findings section"""
-    key_findings = report.get("key_findings", [])
+    # Try both possible keys (key_findings and key_findings_by_category)
+    findings_by_category = report.get("key_findings_by_category", {})
     
-    if not key_findings:
-        st.info("No key findings available yet")
-        return
-    
-    # Group by category
-    findings_by_category = {}
-    for finding in key_findings:
-        category = finding.get("category", "General")
-        if category not in findings_by_category:
-            findings_by_category[category] = []
-        findings_by_category[category].append(finding)
+    if not findings_by_category:
+        # Fallback to old format
+        key_findings = report.get("key_findings", [])
+        if not key_findings:
+            st.info("No key findings available yet")
+            return
+        
+        # Group by category
+        findings_by_category = {}
+        for finding in key_findings:
+            category = finding.get("category", "General")
+            if category not in findings_by_category:
+                findings_by_category[category] = []
+            findings_by_category[category].append(finding)
     
     # Display by category
     for category, findings in findings_by_category.items():
