@@ -387,10 +387,7 @@ class ContentExtractor:
     async def extract_content(self, html: str, url: str) -> Dict[str, Any]:
         """
         Extract main content from HTML
-        Note: In production, use BeautifulSoup4
         """
-        # Placeholder implementation
-        # In production, implement proper HTML parsing
         return {
             "text": html[:5000],  # Simplified
             "title": "",

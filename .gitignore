@@ -37,3 +37,14 @@ coverage/
 
 # LangSmith
 langsmith.json
+
+
+#extra files
+ARCHITECTURE.md
+GRAPH_VISUALIZATION_GUIDE.md
+IMPROVEMENT_PLAN.md
+SETUP_GUIDE.md
+visualize_architecture.py
+visualize_langgraph.py
+PROJECT_REPORT.md
+LANGGRAPH_WORKFLOW.md
